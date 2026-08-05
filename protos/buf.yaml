@@ -1,0 +1,7 @@
+version: v2
+modules:
+  - path: common/v1
+  - path: k8s/v1
+lint:
+  use:
+    - STANDARD

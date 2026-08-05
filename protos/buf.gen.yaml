@@ -1,0 +1,7 @@
+version: v2
+plugins:
+  - plugin: prost
+    out: gen/rust
+    opt:
+      - compile_well_known_types
+      - extern_path=.google.protobuf=::pbjson_types

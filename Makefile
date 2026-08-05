@@ -18,9 +18,9 @@ dev: proto
 dev-all:
 	cd deploy && docker compose up -d
 	sleep 5
-	cd services/gateway && cargo run &
+	cd services/gateway && GATEWAY_CONFIG=../../config/gateway.yaml cargo run &
 	sleep 2
-	cd services/k8s && cargo run &
+	cd services/k8s && K8S_CONFIG=../../config/k8s-service.yaml cargo run &
 	sleep 2
 	cd frontend && npm run dev
 
