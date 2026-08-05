@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package common.v1;
+
+message Pagination {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message PaginatedResponse {
+  int32 total = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+}
+
+message Error {
+  int32 code = 1;
+  string message = 2;
+  map<string, string> details = 3;
+}

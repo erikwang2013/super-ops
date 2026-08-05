@@ -1,0 +1,12 @@
+[package]
+name = "ecat-tracing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Distributed tracing (OpenTelemetry) for e-cat"
+
+[dependencies]
+tracing.workspace = true
+tracing-subscriber.workspace = true
+http.workspace = true
+tower.workspace = true

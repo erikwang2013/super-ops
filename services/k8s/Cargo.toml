@@ -1,0 +1,30 @@
+[package]
+name = "superops-k8s"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SuperOps K8s Service - multi-cluster management"
+
+[dependencies]
+superops-protos = { path = "../../superops-protos" }
+ecat = { path = "../../ecat" }
+ecat-transport-grpc = { path = "../../ecat-transport-grpc" }
+ecat-data-sqlx = { path = "../../ecat-data-sqlx" }
+tonic.workspace = true
+prost.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml = "0.9"
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow = "1"
+uuid = { version = "1", features = ["v4"] }
+kube = { version = "0.93", features = ["runtime", "derive", "client", "ws"] }
+k8s-openapi = { version = "0.22", features = ["v1_29"] }
+dashmap = "6"
+futures = "0.3"
+tokio-stream = "0.1"
+
+[build-dependencies]
+tonic-build.workspace = true

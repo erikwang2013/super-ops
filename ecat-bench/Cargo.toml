@@ -1,0 +1,9 @@
+[package]
+name = "ecat-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Benchmarking utilities for e-cat services"
+
+[dependencies]
+tokio.workspace = true

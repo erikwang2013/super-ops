@@ -1,0 +1,27 @@
+/.idea
+/.vscode
+*.log
+.env
+tests
+/.cursor
+/.github
+.claude
+.claude-flow
+.swarm
+.mcp.json
+ruvector.db
+.superpowers/state/target
+.agents
+skills-lock.json
+.php-cs-fixer.cache
+*.backup
+*.bak
+target
+
+# SuperOps additions
+node_modules/
+dist/
+.superpowers/brainstorm/
+frontend/src-tauri/target/
+services/gateway/target/
+services/k8s/target/

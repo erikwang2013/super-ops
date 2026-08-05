@@ -1,0 +1,162 @@
+syntax = "proto3";
+
+package k8s.v1;
+
+import "common/v1/common.proto";
+
+service K8sService {
+  rpc ListClusters(ListClustersRequest) returns (ListClustersResponse);
+  rpc GetCluster(GetClusterRequest) returns (GetClusterResponse);
+  rpc AddCluster(AddClusterRequest) returns (AddClusterResponse);
+  rpc RemoveCluster(RemoveClusterRequest) returns (RemoveClusterResponse);
+
+  rpc ListPods(ListPodsRequest) returns (ListPodsResponse);
+  rpc ListDeployments(ListDeploymentsRequest) returns (ListDeploymentsResponse);
+  rpc ListNodes(ListNodesRequest) returns (ListNodesResponse);
+
+  rpc WatchResources(WatchResourcesRequest) returns (stream WatchEvent);
+  rpc GetPodLogs(GetPodLogsRequest) returns (stream LogLine);
+  rpc ExecPod(stream ExecRequest) returns (stream ExecResponse);
+
+  rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse);
+}
+
+message Cluster {
+  string id = 1;
+  string name = 2;
+  string version = 3;
+  int32 node_count = 4;
+  int32 pod_count = 5;
+  string status = 6;
+  int64 created_at = 7;
+}
+
+message ListClustersRequest {}
+message ListClustersResponse { repeated Cluster clusters = 1; }
+
+message GetClusterRequest { string cluster_id = 1; }
+message GetClusterResponse { Cluster cluster = 1; }
+
+message AddClusterRequest {
+  string name = 1;
+  bytes kubeconfig = 2;
+}
+message AddClusterResponse { Cluster cluster = 1; }
+
+message RemoveClusterRequest { string cluster_id = 1; }
+message RemoveClusterResponse {}
+
+message Pod {
+  string name = 1;
+  string namespace = 2;
+  string status = 3;
+  string node = 4;
+  int32 restarts = 5;
+  string age = 6;
+  repeated ContainerInfo containers = 7;
+  map<string, string> labels = 8;
+}
+
+message ContainerInfo {
+  string name = 1;
+  string image = 2;
+  bool ready = 3;
+}
+
+message ListPodsRequest {
+  string cluster_id = 1;
+  string namespace = 2;
+  common.v1.Pagination pagination = 3;
+}
+message ListPodsResponse {
+  repeated Pod pods = 1;
+  common.v1.PaginatedResponse page = 2;
+}
+
+message Deployment {
+  string name = 1;
+  string namespace = 2;
+  int32 replicas = 3;
+  int32 ready_replicas = 4;
+  int32 updated_replicas = 5;
+  string age = 6;
+  repeated string images = 7;
+}
+
+message ListDeploymentsRequest {
+  string cluster_id = 1;
+  string namespace = 2;
+}
+message ListDeploymentsResponse { repeated Deployment deployments = 1; }
+
+message Node {
+  string name = 1;
+  string status = 2;
+  string role = 3;
+  string version = 4;
+  string age = 5;
+  string cpu = 6;
+  string memory = 7;
+}
+
+message ListNodesRequest { string cluster_id = 1; }
+message ListNodesResponse { repeated Node nodes = 1; }
+
+message WatchResourcesRequest {
+  string cluster_id = 1;
+  string namespace = 2;
+  repeated string resource_types = 3;
+}
+
+message WatchEvent {
+  string event_type = 1;
+  string resource_type = 2;
+  string resource_name = 3;
+  string namespace = 4;
+  bytes payload = 5;
+}
+
+message GetPodLogsRequest {
+  string cluster_id = 1;
+  string namespace = 2;
+  string pod_name = 3;
+  string container = 4;
+  int32 tail_lines = 5;
+  bool follow = 6;
+}
+
+message LogLine {
+  string content = 1;
+  int64 timestamp = 2;
+}
+
+message ExecRequest {
+  string cluster_id = 1;
+  string namespace = 2;
+  string pod_name = 3;
+  string container = 4;
+  string command = 5;
+  bytes stdin = 6;
+  TerminalSize terminal_size = 7;
+}
+
+message TerminalSize { int32 width = 1; int32 height = 2; }
+
+message ExecResponse {
+  bytes stdout = 1;
+  bytes stderr = 2;
+}
+
+message GetMetricsRequest {
+  string cluster_id = 1;
+  string resource_type = 2;
+  string resource_name = 3;
+}
+message GetMetricsResponse { repeated MetricPoint metrics = 1; }
+
+message MetricPoint {
+  string name = 1;
+  double value = 2;
+  string unit = 3;
+  int64 timestamp = 4;
+}

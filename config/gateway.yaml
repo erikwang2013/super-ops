@@ -1,0 +1,18 @@
+server:
+  http_port: 8080
+  grpc_port: 9090
+
+auth:
+  jwt_secret: "change-me-in-production"
+  access_token_ttl: 1800
+  refresh_token_ttl: 604800
+
+database:
+  url: "mysql://superops:superops@localhost:3306/superops"
+
+redis:
+  url: "redis://localhost:6379"
+
+services:
+  k8s:
+    endpoint: "http://localhost:9091"
