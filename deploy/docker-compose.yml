@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: superops
+      MYSQL_USER: superops
+      MYSQL_PASSWORD: superops
+    ports: ["3306:3306"]
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    ports: ["8123:8123", "9000:9000"]
+    environment:
+      CLICKHOUSE_DB: superops
+      CLICKHOUSE_USER: superops
+      CLICKHOUSE_PASSWORD: superops
+    volumes: [clickhouse_data:/var/lib/clickhouse]
+
+volumes:
+  mysql_data:
+  clickhouse_data:
