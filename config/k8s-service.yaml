@@ -2,4 +2,4 @@ server:
   grpc_port: 9091
 
 database:
-  url: "mysql://superops:superops@localhost:3306/superops"
+  url: "mysql://superops:superops@localhost:3307/superops"

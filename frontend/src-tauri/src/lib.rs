@@ -1,5 +1,6 @@
+use tauri::menu::{Menu, MenuItemBuilder};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, Menu, MenuItem, WindowEvent};
+use tauri::{AppHandle, Manager, WindowEvent};
 
 #[tauri::command]
 fn get_system_info() -> String {
@@ -18,15 +19,14 @@ fn show_main_window(app: &AppHandle) {
 }
 
 pub fn run() {
-    let show_item = MenuItem::with_id("show", "显示面板", true, None::<&str>).unwrap();
-    let quit_item = MenuItem::with_id("quit", "退出", true, None::<&str>).unwrap();
-    let menu = Menu::with_items([&show_item, &quit_item]);
-
     tauri::Builder::default()
         .setup(|app| {
+            let show_item = MenuItemBuilder::with_id("show", "显示面板").build(app.handle())?;
+            let quit_item = MenuItemBuilder::with_id("quit", "退出").build(app.handle())?;
+            let menu = Menu::with_items(app.handle(), &[&show_item, &quit_item])?;
             let _tray = TrayIconBuilder::new()
                 .menu(&menu)
-                .on_menu_event(|app, event| match event.id.as_ref() {
+                .on_menu_event(|app, event| match event.id().as_ref() {
                     "show" => show_main_window(app),
                     "quit" => app.exit(0),
                     _ => {}
