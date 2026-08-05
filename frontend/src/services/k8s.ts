@@ -7,7 +7,7 @@ export interface NodeInfo { name: string; status: string; role: string; version:
 
 export const k8sApi = {
   listClusters: () => api.get<{ clusters: Cluster[] }>('/k8s/clusters'),
-  addCluster: (name: string, kubeconfig: string) => api.post<{ cluster: Cluster }>('/k8s/clusters', { name, kubeconfig }),
+  addCluster: (name: string, kubeconfig: string) => api.post<{ id: string; name: string; status: string }>('/k8s/clusters', { name, kubeconfig }),
   removeCluster: (id: string) => api.delete(`/k8s/clusters/${id}`),
   listPods: (clusterId: string, namespace?: string) => api.get<{ pods: Pod[] }>(`/k8s/clusters/${clusterId}/pods?namespace=${namespace || ''}`),
   listDeployments: (clusterId: string) => api.get<{ deployments: Deployment[] }>(`/k8s/clusters/${clusterId}/deployments`),

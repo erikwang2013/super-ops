@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card, Form, Input, Button, Space } from 'antd';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
@@ -8,22 +8,50 @@ import 'xterm/css/xterm.css';
 export default function TerminalPage() {
   const ref = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const termRef = useRef<Terminal | null>(null);
   const [connected, setConnected] = useState(false);
 
+  useEffect(() => {
+    return () => {
+      wsRef.current?.close();
+      termRef.current?.dispose();
+      wsRef.current = null;
+      termRef.current = null;
+    };
+  }, []);
+
   const connect = (v: { cluster: string; namespace: string; pod: string }) => {
+    wsRef.current?.close();
+    termRef.current?.dispose();
+
     const term = new Terminal({ fontSize: 14, fontFamily: 'Menlo,monospace', cursorBlink: true, theme: { background: '#1a1a2e', foreground: '#e0e0e0' } });
-    const fit = new FitAddon(); term.loadAddon(fit); term.loadAddon(new WebLinksAddon());
+    const fit = new FitAddon();
+    term.loadAddon(fit);
+    term.loadAddon(new WebLinksAddon());
+    termRef.current = term;
     if (ref.current) { term.open(ref.current); fit.fit(); }
 
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${proto}//${location.host}/api/k8s/clusters/${v.cluster}/pods/${v.namespace}/${v.pod}/exec`);
+    wsRef.current = ws;
+
+    const onResize = () => fit.fit();
     ws.onopen = () => setConnected(true);
     ws.onmessage = (e) => term.write(e.data);
-    ws.onclose = () => { setConnected(false); term.dispose(); };
-    ws.onerror = () => { setConnected(false); term.dispose(); };
+    ws.onclose = () => {
+      setConnected(false);
+      term.dispose();
+      termRef.current = null;
+      window.removeEventListener('resize', onResize);
+    };
+    ws.onerror = () => {
+      setConnected(false);
+      term.dispose();
+      termRef.current = null;
+      window.removeEventListener('resize', onResize);
+    };
     term.onData((d) => { if (ws.readyState === WebSocket.OPEN) ws.send(d); });
-    wsRef.current = ws;
-    window.addEventListener('resize', () => fit.fit());
+    window.addEventListener('resize', onResize);
   };
 
   return (

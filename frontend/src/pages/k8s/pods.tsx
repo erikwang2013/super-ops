@@ -2,8 +2,8 @@ import { ProTable } from '@ant-design/pro-components';
 import { useQuery } from '@tanstack/react-query';
 import { k8sApi, Pod } from '../../services/k8s';
 
-export default function PodsPage() {
-  const { data, isLoading } = useQuery({ queryKey: ['pods'], queryFn: () => k8sApi.listPods('default') });
+export default function PodsPage({ clusterId }: { clusterId: string }) {
+  const { data, isLoading } = useQuery({ queryKey: ['pods', clusterId], queryFn: () => k8sApi.listPods(clusterId) });
   return <ProTable<Pod> columns={[
     { title: '名称', dataIndex: 'name' }, { title: '命名空间', dataIndex: 'namespace' },
     { title: '状态', dataIndex: 'status' }, { title: '节点', dataIndex: 'node' },

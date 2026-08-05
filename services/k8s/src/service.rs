@@ -5,12 +5,11 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
 use superops_protos::k8s::v1::{
-    k8s_service_server::K8sService, AddClusterRequest, AddClusterResponse, Cluster,
-    GetClusterRequest, GetClusterResponse, GetMetricsRequest, GetMetricsResponse,
-    GetPodLogsRequest, ListClustersRequest, ListClustersResponse, ListDeploymentsRequest,
-    ListDeploymentsResponse, ListNodesRequest, ListNodesResponse, ListPodsRequest,
-    ListPodsResponse, LogLine, RemoveClusterRequest, RemoveClusterResponse,
-    WatchEvent, WatchResourcesRequest,
+    AddClusterRequest, AddClusterResponse, Cluster, GetClusterRequest, GetClusterResponse,
+    GetMetricsRequest, GetMetricsResponse, GetPodLogsRequest, ListClustersRequest,
+    ListClustersResponse, ListDeploymentsRequest, ListDeploymentsResponse, ListNodesRequest,
+    ListNodesResponse, ListPodsRequest, ListPodsResponse, LogLine, RemoveClusterRequest,
+    RemoveClusterResponse, WatchEvent, WatchResourcesRequest, k8s_service_server::K8sService,
 };
 
 use crate::cluster::manager::ClusterManager;
@@ -137,7 +136,11 @@ impl K8sService for K8sServiceImpl {
                     name: d.name_any(),
                     namespace: d.namespace().unwrap_or_default(),
                     replicas: d.spec.as_ref().and_then(|s| s.replicas).unwrap_or(0),
-                    ready_replicas: d.status.as_ref().and_then(|s| s.ready_replicas).unwrap_or(0),
+                    ready_replicas: d
+                        .status
+                        .as_ref()
+                        .and_then(|s| s.ready_replicas)
+                        .unwrap_or(0),
                     ..Default::default()
                 })
                 .collect(),
@@ -166,7 +169,13 @@ impl K8sService for K8sServiceImpl {
                         .as_ref()
                         .and_then(|s| s.conditions.as_ref())
                         .and_then(|c| c.iter().find(|c| c.type_ == "Ready"))
-                        .map(|c| if c.status == "True" { "Ready" } else { "NotReady" })
+                        .map(|c| {
+                            if c.status == "True" {
+                                "Ready"
+                            } else {
+                                "NotReady"
+                            }
+                        })
                         .unwrap_or("Unknown")
                         .into(),
                     version: n
@@ -200,15 +209,24 @@ impl K8sService for K8sServiceImpl {
         let (tx, rx) = mpsc::channel::<Result<WatchEvent, Status>>(128);
         tokio::spawn(async move {
             futures::pin_mut!(pod_stream);
+            let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
             while let Some(event) = pod_stream.next().await {
                 let watch_event = match event {
-                    kube::runtime::watcher::Event::Apply(pod) => WatchEvent {
-                        event_type: "MODIFIED".into(),
-                        resource_type: "pod".into(),
-                        resource_name: pod.name_any(),
-                        namespace: pod.namespace().unwrap_or_default(),
-                        ..Default::default()
-                    },
+                    kube::runtime::watcher::Event::Apply(pod) => {
+                        let name = pod.name_any();
+                        let event_type = if seen.insert(name.clone()) {
+                            "ADDED"
+                        } else {
+                            "MODIFIED"
+                        };
+                        WatchEvent {
+                            event_type: event_type.into(),
+                            resource_type: "pod".into(),
+                            resource_name: name,
+                            namespace: pod.namespace().unwrap_or_default(),
+                            ..Default::default()
+                        }
+                    }
                     kube::runtime::watcher::Event::Delete(pod) => WatchEvent {
                         event_type: "DELETED".into(),
                         resource_type: "pod".into(),
@@ -251,12 +269,7 @@ impl K8sService for K8sServiceImpl {
         };
 
         let log_stream = resource::pod::get_pod_logs(
-            client,
-            namespace,
-            pod_name,
-            container,
-            tail_lines,
-            req.follow,
+            client, namespace, pod_name, container, tail_lines, req.follow,
         )
         .await
         .map_err(|e| Status::internal(e.to_string()))?;

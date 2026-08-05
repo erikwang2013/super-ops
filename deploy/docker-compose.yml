@@ -2,10 +2,10 @@ services:
   mysql:
     image: mysql:8.0
     environment:
-      MYSQL_ROOT_PASSWORD: root123
-      MYSQL_DATABASE: superops
-      MYSQL_USER: superops
-      MYSQL_PASSWORD: superops
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-superops}
+      MYSQL_USER: ${MYSQL_USER:-superops}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-superops}
     ports: ["3307:3306"]
     volumes:
       - mysql_data:/var/lib/mysql
@@ -27,10 +27,14 @@ services:
     image: clickhouse/clickhouse-server:24-alpine
     ports: ["8124:8123", "9001:9000"]
     environment:
-      CLICKHOUSE_DB: superops
-      CLICKHOUSE_USER: superops
-      CLICKHOUSE_PASSWORD: superops
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-superops}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-superops}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-superops}
     volumes: [clickhouse_data:/var/lib/clickhouse]
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      retries: 5
 
 volumes:
   mysql_data:

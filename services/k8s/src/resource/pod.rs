@@ -1,10 +1,10 @@
 use anyhow::Result;
+use futures::AsyncBufReadExt;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Pod;
-use kube::api::LogParams;
-use kube::runtime::watcher::{watcher, Event};
 use kube::Api;
-use futures::AsyncBufReadExt;
+use kube::api::LogParams;
+use kube::runtime::watcher::{Event, watcher};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -41,7 +41,9 @@ pub async fn get_pod_logs(
         let mut lines = log_stream.lines();
         while let Some(line) = lines.next().await {
             if let Ok(line) = line {
-                let _ = tx.send(line).await;
+                if tx.send(line).await.is_err() {
+                    break;
+                }
             }
         }
     });
@@ -63,7 +65,9 @@ pub async fn watch_pods(
         futures::pin_mut!(w);
         while let Some(event) = w.next().await {
             if let Ok(event) = event {
-                let _ = tx.send(event).await;
+                if tx.send(event).await.is_err() {
+                    break;
+                }
             }
         }
     });

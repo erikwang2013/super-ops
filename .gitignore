@@ -4,7 +4,6 @@
 .env
 tests
 /.cursor
-/.github
 .claude
 .claude-flow
 .swarm

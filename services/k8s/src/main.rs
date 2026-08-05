@@ -16,10 +16,9 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::load()?;
     let manager = ClusterManager::new();
 
-    let grpc = GrpcServer::new(format!("0.0.0.0:{}", config.server.grpc_port))
-        .routes(tonic::service::Routes::new(K8sServiceServer::new(
-            K8sServiceImpl { manager },
-        )));
+    let grpc = GrpcServer::new(format!("0.0.0.0:{}", config.server.grpc_port)).routes(
+        tonic::service::Routes::new(K8sServiceServer::new(K8sServiceImpl { manager })),
+    );
 
     let mut app = App::builder()
         .name("superops-k8s")

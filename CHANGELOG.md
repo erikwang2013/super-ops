@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.0.3] — 2026-08-06 — SuperOps services
+
+### Security
+- 认证绕过（CRITICAL）修复：gateway `auth_middleware` 重写为真实 JWT 验签（`verify_token` + Claims 注入 extensions），并挂载到全部 `/api/k8s/*` 路由；此前仅检查 `Bearer ` 前缀且未挂载
+- login 增加速率限制：内存固定窗口 10 次/60 秒/IP（x-forwarded-for 取值），超限 429；Redis 共享留待 Phase 2 多实例
+- `SUPEROPS_JWT_SECRET` 环境变量覆盖默认密钥，生产默认密钥启动输出 WARN
+- 注册/登录输入校验（username 3-32、email 5-254、password 8-72），handler 移除全部 `.unwrap()`
+- CORS 白名单化（localhost:3000 / tauri.localhost / tauri://localhost），方法/头收紧
+- Tauri 启用 CSP：生产 `connect-src` 仅 gateway:8080；devCsp 放开 vite HMR
+- 前端 token 移除 zustand persist（仅存内存，不再落 localStorage）
+
+### Fixed
+- k8s watcher：首次观察事件区分 ADDED/MODIFIED（seen-set），不再全部标 MODIFIED
+- k8s pod log/watch stream：`tx.send` 失败后 break，客户端断开不再持续读
+- 前端 terminal.tsx：useEffect cleanup（WS/terminal dispose、onResize listener 移除）
+- 前端类型对齐：addCluster 响应 `{id,name,status}`、cluster-detail 真实 clusterId 传 props
+- 两个服务 crate `cargo check` 零警告（Phase 2 预留字段 `#[allow(dead_code)]` 并注明用途）
+
+### Infrastructure
+- 补齐 CI：`.github/workflows/ci.yml`（rust fmt --check + check + test；frontend tsc + vite build），移除 `.gitignore` 对 `.github` 的忽略
+- docker-compose：ClickHouse healthcheck（clickhouse-client SELECT 1）、全部密码变量化；新增 `deploy/.env.example` 模板
+- 文档：README.md / README.en.md 补齐；审查报告 `docs/audit-report-2026-08-06.md` 更新至本轮修复状态
+
 ## [2.3.1] — 2026-08-06
 
 ### Fixed
