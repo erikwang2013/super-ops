@@ -21,3 +21,12 @@ fn truncate_caps_at_256k() {
     );
     assert_eq!(crate::recorder::truncate(&vec![0u8; 8]).len(), 8);
 }
+
+#[test]
+fn seq_increments_per_session() {
+    let mut map = std::collections::HashMap::new();
+    assert_eq!(crate::recorder::bump_seq(&mut map, "s1"), 1);
+    assert_eq!(crate::recorder::bump_seq(&mut map, "s1"), 2);
+    assert_eq!(crate::recorder::bump_seq(&mut map, "s2"), 1);
+    assert_eq!(crate::recorder::bump_seq(&mut map, "s1"), 3);
+}

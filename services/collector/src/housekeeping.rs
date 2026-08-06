@@ -26,13 +26,20 @@ pub fn is_backup_file(name: &str) -> bool {
     stem.starts_with("superops-") && !stem.contains('/') && !stem.contains("..")
 }
 
-/// "2500m" → 2.5 核；"2" → 2.0 核
+/// "2500m" → 2.5 核；"2" → 2.0 核；无法解析或非有限值（NaN/Inf）→ 0.0
 pub fn parse_cpu_cores(s: &str) -> f64 {
     let s = s.trim();
     if let Some(v) = s.strip_suffix('m') {
-        v.parse::<f64>().map(|n| n / 1000.0).unwrap_or(0.0)
+        v.parse::<f64>()
+            .ok()
+            .map(|n| n / 1000.0)
+            .filter(|n| n.is_finite())
+            .unwrap_or(0.0)
     } else {
-        s.parse::<f64>().unwrap_or(0.0)
+        s.parse::<f64>()
+            .ok()
+            .filter(|n| n.is_finite())
+            .unwrap_or(0.0)
     }
 }
 
@@ -58,7 +65,11 @@ pub fn parse_mem_gib(s: &str) -> f64 {
     } else {
         (s, 1.0)
     };
-    num.parse::<f64>().map(|n| n * mult / GIB).unwrap_or(0.0)
+    num.parse::<f64>()
+        .ok()
+        .map(|n| n * mult / GIB)
+        .filter(|n| n.is_finite())
+        .unwrap_or(0.0)
 }
 
 /// epoch 秒 → UTC "%Y-%m-%d-%H%M%S"（workspace 无 chrono，自实现）
@@ -121,6 +132,8 @@ pub fn backup_mysql(cfg: &MysqlConfig) -> anyhow::Result<()> {
             "mysqldump failed, backup skipped: {}",
             String::from_utf8_lossy(&out.stderr).trim()
         );
+        // 管道失败会留下半成品 .sql.gz（仍匹配备份命名规则），删除以免被保留/误当有效备份
+        let _ = std::fs::remove_file(&path);
         return Ok(());
     }
     tracing::info!(path = %path, "mysql backup written");
@@ -130,8 +143,12 @@ pub fn backup_mysql(cfg: &MysqlConfig) -> anyhow::Result<()> {
 
 /// 按 mtime 保留最新 `keep` 个匹配备份命名规则的文件, 其余删除
 fn prune_backups(dir: &str, keep: usize) {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(e) => {
+            tracing::warn!("backup prune: cannot read dir {dir}: {e}");
+            return;
+        }
     };
     let mut files: Vec<(std::path::PathBuf, i64)> = entries
         .filter_map(|e| e.ok())

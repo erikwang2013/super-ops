@@ -158,7 +158,7 @@ P4（写操作/审计/用户管理）、P5（日志/CMDB/脚本库/RBAC）、P6�
 
 - `cargo fmt --check` ✅ 无 diff
 - `cargo check --workspace` ✅ 通过（零错误）
-- `cargo test --workspace --no-fail-fast` ✅ **358 项全过，0 失败**（≥296 基线达成；其中 P4/P5/P6 新增 gateway 审批/保险库/录制等测试与 collector 集成测试）
+- `cargo test --workspace --no-fail-fast` ✅ **361 项全过，0 失败**（≥296 基线达成；其中 P4/P5/P6 新增 gateway 审批/保险库/录制等测试与 collector 集成测试；复审新增 seq 序号、租户 400 严格化、NaN 守卫等测试）
 - `cd frontend && npm run build` ✅ 通过（vite 构建成功；仅 500kB chunk 体积警告，非阻塞）
 - 运行时冒烟（尽力而为）：gateway/MySQL/Redis/ClickHouse 进程在跑（docker socket 对本用户无权限，无法 `docker ps` 核对 compose 状态）；`POST /api/auth/login` → 200 + `access_token`；携带 token 访问受保护路由 `GET /api/k8s/clusters` → **200（非 403）** ✅；注意：运行中的 gateway 为 P4 之前的旧二进制（`/api/audit/events`、`/api/secrets`、`/api/approvals`、`/api/alerts`、`/api/recordings`、`/api/files` 均返回 404），新端点冒烟需重新构建部署后补做
 
@@ -166,9 +166,9 @@ P4（写操作/审计/用户管理）、P5（日志/CMDB/脚本库/RBAC）、P6�
 
 | crate | 单测 | 集成测试 | 合计 |
 |---|---|---|---|
-| superops-gateway | 71 | — | 71 |
+| superops-gateway | 73 | — | 73 |
 | superops-k8s | 14 | — | 14 |
-| superops-collector | 13 | 18（alert/ch/collect/config/events/inspect_test） | 31 |
+| superops-collector | 14 | 18（alert/ch/collect/config/events/inspect_test） | 32 |
 | ecat-middleware | 23 | — | 23 |
 | ecat-auth | 15 | — | 15 |
 | ecat-encoding | 15 | — | 15 |
@@ -186,31 +186,34 @@ P4（写操作/审计/用户管理）、P5（日志/CMDB/脚本库/RBAC）、P6�
 | 其余 16 个 ecat-* crate | 各 2 | — | 32 |
 | 其余 6 个 ecat-* crate（arangodb/iotdb/neo4j/logging/tracing-otlp/transport-ws） | 各 1 | — | 6 |
 | 0 测试 crate（bench/ecat-data/ecat-lock/ecat-protos/helloworld/superops-protos） | 0 | — | 0 |
-| **合计** | **340** | **18** | **358** |
+| **合计** | **343** | **18** | **361** |
 
 （grand total 由全部 `test result` 行求和得出；单测行数由 `Running unittests` 二进制归属，并行输出下个别归属可能偏差 ±1，总量与失败数为准。）
 
-### 8.5 已知限制与延期项（deferred，逐项记录）
+### 8.5 已知限制与延期项（deferred，逐项记录 — 2026-08-07 复审后状态）
 
-| # | 项目（中文 — English） |
-|---|---|
-| 1 | k8s_proxy.rs 实测 548 行，超 500 行约束（既有债务）— k8s_proxy.rs measures 548 lines, over the 500-line rule (pre-existing debt) |
-| 2 | OAuth2 角色解析依赖外部 IdP claims — OAuth2 role resolution depends on external IdP claims (auth) |
-| 3 | 多租户设计警示：tenant 由客户端 header 断言；users.tenant_id 列未实际使用（init.sql 已加列，model/user.rs 未引用）；畸形 header 静默回落 `default`；回归测试自引用 — Multi-tenancy caveats: tenant asserted from a client-supplied header; `users.tenant_id` column unused; malformed headers silently fall back to `default`; regression tests are self-referential |
-| 4 | housekeeping 小项：NaN 静默求和；不可读目录静默跳过；仅备份部分文件；dev yaml root123 默认口令（有 env 覆盖）— housekeeping: NaN sums silently; unreadable dirs skipped; partial backup files; dev YAML ships `root123` default password (env-overridable) |
-| 5 | secrets 小项：`Key::from_slice` panic 面；SecretRow 实现 Debug；rand 多版本并存（lockfile 0.8/0.9/0.10）— secrets: `Key::from_slice` panics on wrong key length; `SecretRow` derives Debug; multiple rand versions coexist in the lockfile |
-| 6 | ClickhouseClient 不可 Clone（设计说明，非缺陷）— ClickhouseClient is not Clone by design |
-| 7 | frames 响应上限 5000 帧（理论最坏 ~1.7GB）— frames response capped at 5000 frames (~1.7GB worst case) |
-| 8 | DELETE 轻量删除异步生效（204 后行才消失）— lightweight deletes apply asynchronously (rows disappear after 204) |
-| 9 | 同秒帧无序号（recording 回放顺序在秒内不保证）— same-second frames carry no sequence number (recording order) |
-| 10 | `DefaultBodyLimit` 413 与常规 400 错误形态不一致 — 413 (DefaultBodyLimit) vs 400 error shapes are inconsistent |
-| 11 | `create_dir_all` 启动期硬失败（备份目录/上传目录不可创建即报错）— `create_dir_all` fails hard at startup |
-| 12 | exec 录制无条件开启（无配置开关）— exec recording is always on (no toggle) |
-| 13 | OTLP 流式路径 span 无 resource 字段（非阻塞）— OTLP spans on streaming paths lack resource fields (non-blocking) |
-| 14 | 指标页角色：`/api/v1/metrics/query` 在 k8s_read_routes（api:read），页面在 ops 菜单 — 仅 api:read 用户可看；已记录 — metrics page: query route is api:read while the page sits in the ops menu; only api:read users can view; documented |
-| 15 | main.rs 实测 602 行，超 500 行约束（路由组增长点）— main.rs measures 602 lines, over the 500-line rule (route-group growth point) |
-| 16 | ack 对不存在告警 id 也存储 1h（幂等设计，可接受）— ack stores nonexistent alert ids for 1h too (idempotent by design, accepted) |
+> 状态列：✅ 已修复（本日复审闭环）/ 📌 保留（设计取舍或既有债务，已记录原因）
+
+| # | 项目（中文 — English） | 状态 |
+|---|---|---|
+| 1 | k8s_proxy.rs 实测 548 行，超 500 行约束（既有债务）— k8s_proxy.rs measures 548 lines, over the 500-line rule (pre-existing debt) | ✅ 拆分（proxy/k8s_proxy.rs 418 行 + k8s_exec.rs 139 行） |
+| 2 | OAuth2 角色解析依赖外部 IdP claims — OAuth2 role resolution depends on external IdP claims (auth) | 📌 依赖引入方：外部 IdP 的 scope/claim 契约，网关侧仅映射（见 routes.rs k8s OAuth2Layer 挂载） |
+| 3 | 多租户设计警示：tenant 由客户端 header 断言；users.tenant_id 列未实际使用（init.sql 已加列，model/user.rs 未引用）；畸形 header 静默回落 `default`；回归测试自引用 — Multi-tenancy caveats: tenant asserted from a client-supplied header; `users.tenant_id` column unused; malformed headers silently fall back to `default`; regression tests are self-referential | ✅ 修复：tenant_id 已接线（User/UserRow/list_users/create，注册恒为 'default'）；畸形 x-tenant-id → 400（缺失头仍回退 default），tenant_test 同步覆盖两态。📌 保留：tenant 由客户端头断言（无服务端租户目录，属设计）；回归测试自引用（单测无法起真实 MySQL+gateway，占位中间件等价性已注释） |
+| 4 | housekeeping 小项：NaN 静默求和；不可读目录静默跳过；仅备份部分文件；dev yaml root123 默认口令（有 env 覆盖）— housekeeping: NaN sums silently; unreadable dirs skipped; partial backup files; dev YAML ships `root123` default password (env-overridable) | ✅ 修复：parse_cpu_cores/parse_mem_gib 非有限值（NaN/Inf）→ 0.0（+ 单测）；prune_backups 目录不可读 → warn；mysqldump 管道失败删除半成品 .sql.gz。📌 保留：dev yaml root123 默认口令（config/gateway.yaml，env 可覆盖，仅 dev 形态） |
+| 5 | secrets 小项：`Key::from_slice` panic 面；SecretRow 实现 Debug；rand 多版本并存（lockfile 0.8/0.9/0.10）— secrets: `Key::from_slice` panics on wrong key length; `SecretRow` derives Debug; multiple rand versions coexist in the lockfile | ✅ 修复：vault.rs `cipher()` 32 字节长度校验（panic→Err，503 语义不变）；SecretRow 手动 Debug 密文打码。📌 保留：rand 多版本（0.8/0.9/0.10 由 upstream 固定：sqlx/opentelemetry_sdk/kube-client/tower 0.4 锁 0.8，bson/mongodb 锁 0.9，hickory/quinn-proto 锁 0.10；workspace 无法统一，各 crate 均直接依赖，无传递混用风险） |
+| 6 | ClickhouseClient 不可 Clone（设计说明，非缺陷）— ClickhouseClient is not Clone by design | 📌 设计说明：录制/写入路径经 `&Arc<ClickhouseClient>` 共享（record_frame 签名即如此），无需 Clone |
+| 7 | frames 响应上限 5000 帧（理论最坏 ~1.7GB）— frames response capped at 5000 frames (~1.7GB worst case) | 📌 保留：回放接口 `LIMIT 5000`（ORDER BY timestamp, seq），页面前端分页读取，文档已标注 |
+| 8 | DELETE 轻量删除异步生效（204 后行才消失）— lightweight deletes apply asynchronously (rows disappear after 204) | 📌 设计说明：recording 删除为 CH lightweight delete，204 后数据仍可查询片刻，属 CH 语义 |
+| 9 | 同秒帧无序号（recording 回放顺序在秒内不保证）— same-second frames carry no sequence number (recording order) | ✅ 修复：recorder.rs per-session seq（bump_seq，写入前取号），exec_session 增 seq 列；回放 ORDER BY timestamp, seq；recordings_api 返回 seq 字段；recorder_test 覆盖 |
+| 10 | `DefaultBodyLimit` 413 与常规 400 错误形态不一致 — 413 (DefaultBodyLimit) vs 400 error shapes are inconsistent | 📌 保留：axum 默认 BytesRejection → 413 PAYLOAD_TOO_LARGE（语义正确，形态差异记录在案） |
+| 11 | `create_dir_all` 启动期硬失败（备份目录/上传目录不可创建即报错）— `create_dir_all` fails hard at startup | ✅ 修复：fail-soft（创建失败仅 warn，功能降级不崩溃） |
+| 12 | exec 录制无条件开启（无配置开关）— exec recording is always on (no toggle) | ✅ 修复：config `recording.enabled`（默认 true 保持旧行为；config/gateway.yaml 已同步） |
+| 13 | OTLP 流式路径 span 无 resource 字段（非阻塞）— OTLP spans on streaming paths lack resource fields (non-blocking) | 📌 非阻塞：流式（exec/ws）路径 span 走 streaming pipeline，resource 归属性留待 OTel SDK 升级，已记录 |
+| 14 | 指标页角色：`/api/v1/metrics/query` 在 k8s_read_routes（api:read），页面在 ops 菜单 — 仅 api:read 用户可看；已记录 — metrics page: query route is api:read while the page sits in the ops menu; only api:read users can view; documented | 📌 已记录：查询端点归 api:read（与 k8s 只读一致），菜单归属 ops 为前端组织，二者可并存 |
+| 15 | main.rs 实测 602 行，超 500 行约束（路由组增长点）— main.rs measures 602 lines, over the 500-line rule (route-group growth point) | ✅ 拆分（main.rs 186 行 + routes.rs 374 行，路由组迁至 routes.rs） |
+| 16 | ack 对不存在告警 id 也存储 1h（幂等设计，可接受）— ack stores nonexistent alert ids for 1h too (idempotent by design, accepted) | 📌 幂等设计：ack 写入与告警存在性解耦，重复/幽灵 id 返回 202 语义一致，接受 |
+| 17 | 502 错误体回显上游错误细节（k8s backend unreachable/rpc failed + 具体错误）— 502 bodies echo upstream error details (`format!("...: {e}")`) | 📌 保留：错误细节对排障有用（熔断 503 已挡绝大多数异常），回显仅含传输错误文本不含凭据；若需对外脱敏可加错误码映射，已记录 |
 
 ## 9. P6 结论
 
-P4–P6 全部功能落地并通过全量验证：**workspace 358 项测试全过（0 失败）**、`cargo fmt --check`/`cargo check`/`npm run build` 全绿；运行时冒烟 login→受保护 GET 200（非 403）通过。新增安全校验点（SQL 参数化 / 文件名白名单 / 密文不泄露 / 主密钥 503 两态 / 审批门禁 412）复核无异常。第 8.5 节 16 项已知限制均为可接受的设计取舍或既有债务，无阻塞项；新端点运行时冒烟因运行中的 gateway 为旧二进制（P4 前构建）而推迟，重建部署后补验。
+P4–P6 全部功能落地并通过全量验证：**workspace 361 项测试全过（0 失败）**、`cargo fmt --check`/`cargo check`/`npm run build` 全绿；运行时冒烟 login→受保护 GET 200（非 403）通过。新增安全校验点（SQL 参数化 / 文件名白名单 / 密文不泄露 / 主密钥 503 两态 / 审批门禁 412）复核无异常。2026-08-07 复审闭环：第 8.5 节 17 项中 **8 项已修复**（行数超限拆分 ×2、tenant_id 接线与畸形头 400、NaN/Inf 守卫与半成品备份清理、Key 长度校验与密文打码、录制 seq 序号、recording 配置开关、create_dir_all fail-soft），其余 9 项为设计取舍或既有债务（IdP 契约 / rand 多版本 / CH 语义 / 413 形态 / OTLP resource / 指标页角色 / ack 幂等 / 5000 帧上限 / 502 错误回显），均已记录原因，无阻塞项；新端点运行时冒烟因运行中的 gateway 为旧二进制（P4 前构建）而推迟，重建部署后补验。

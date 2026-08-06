@@ -93,12 +93,25 @@ async fn main_chain_order_auth_then_tenant_then_role() {
     let body = axum::body::to_bytes(res.into_body(), 1024).await.unwrap();
     assert_eq!(&body[..], br#"{"tenant":"acme"}"#);
 
-    // 非法租户头：回退 "default" 且不 403
+    // 非法租户头：拒绝 400（审计项：malformed 头静默回退会落入错误租户）
     let res = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/whoami")
                 .header("x-tenant-id", "Acme!")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+    // 缺失租户头：回退 "default" 且不 403
+    let res = app
+        .oneshot(
+            Request::builder()
+                .uri("/whoami")
                 .body(Body::empty())
                 .unwrap(),
         )

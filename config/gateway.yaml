@@ -34,3 +34,7 @@ otlp: "http://localhost:4317"
 # P6-1: 审批工作流 — enabled 时删除 deployment 需先创建并审批通过 delete 审批单
 approval:
   enabled: false
+
+# P6-5: 终端录制 — enabled 时 exec ws 会话逐帧写入 ClickHouse（可经 /api/recordings 回放）
+recording:
+  enabled: true

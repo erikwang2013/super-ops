@@ -50,10 +50,10 @@ fn check_sid(sid: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-// 单次回放上限 5000 帧，防超长会话撑爆内存
+// 单次回放上限 5000 帧，防超长会话撑爆内存；同秒帧按 seq 定序
 fn frames_sql(sid: &str) -> String {
     format!(
-        "SELECT timestamp, frame_b64 FROM exec_session WHERE kind = 'recording' AND session_id = '{}' ORDER BY timestamp LIMIT 5000",
+        "SELECT timestamp, seq, frame_b64 FROM exec_session WHERE kind = 'recording' AND session_id = '{}' ORDER BY timestamp, seq LIMIT 5000",
         esc_sid(sid)
     )
 }
@@ -104,6 +104,7 @@ pub async fn get_frames(
         .filter_map(|r| {
             Some(serde_json::json!({
                 "ts": r.get("timestamp").and_then(as_i64).unwrap_or(0),
+                "seq": r.get("seq").and_then(as_i64).unwrap_or(0),
                 "data": r.get("frame_b64")?.as_str().unwrap_or(""),
             }))
         })

@@ -2,8 +2,9 @@ use base64::Engine as _;
 use ecat_data::{DataPoint, FieldValue, TsdbClient};
 use ecat_data_clickhouse::ClickhouseClient;
 use rand::RngCore;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::Semaphore;
 
@@ -37,6 +38,23 @@ pub fn valid_filename(name: &str) -> bool {
 // 绝不阻塞 ws 桥；写入失败/超时仅告警。
 static FRAME_PERMITS: OnceLock<Semaphore> = OnceLock::new();
 static DROPPED_FRAMES: AtomicU64 = AtomicU64::new(0);
+// 会话级帧序号：时间戳秒级精度下同秒帧可能乱序，seq 用于回放定序。
+// exec_session 仅由本网关写入，首帧写入即固定含 seq 列，字段集保持一致。
+static SESSION_SEQS: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
+
+pub fn bump_seq(map: &mut HashMap<String, u64>, session_id: &str) -> u64 {
+    let seq = map.entry(session_id.to_string()).or_insert(0);
+    *seq += 1;
+    *seq
+}
+
+fn next_seq(session_id: &str) -> u64 {
+    let mut map = SESSION_SEQS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    bump_seq(&mut map, session_id)
+}
 
 pub fn record_frame(ch: &Arc<ClickhouseClient>, session_id: &str, node: &str, frame: &[u8]) {
     if frame.is_empty() {
@@ -57,6 +75,7 @@ pub fn record_frame(ch: &Arc<ClickhouseClient>, session_id: &str, node: &str, fr
     let ch = Arc::clone(ch);
     let sid = session_id.to_string();
     let node = node.to_string();
+    let seq = next_seq(&sid);
     tokio::spawn(async move {
         let _permit = permit;
         let point = DataPoint::new("exec_session")
@@ -67,6 +86,7 @@ pub fn record_frame(ch: &Arc<ClickhouseClient>, session_id: &str, node: &str, fr
                 "frame_b64",
                 FieldValue::String(base64::engine::general_purpose::STANDARD.encode(frame)),
             )
+            .with_field("seq", FieldValue::Int(seq as i64))
             .with_timestamp(now_secs());
         match tokio::time::timeout(Duration::from_secs(2), ch.write(&[point])).await {
             Ok(Ok(())) => {}

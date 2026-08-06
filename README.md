@@ -104,7 +104,7 @@ super-ops/
 | 审批 | 删除 deployment 门禁（`approval.enabled` 时未审批删除返回 412）；`GET/POST /api/approvals`（kind=delete，target 约定 `"{cluster_id}/{ns}/{name}"`）、`POST /api/approvals/{id}/decide`；**默认关闭** |
 | 多租户 | `x-tenant-id` 请求头经 `require_tenant` 中间件解析（仅小写字母/数字/连字符 1..=64，非法/缺失回落 `default`）；cmdb/scripts 数据按 `tenant_id` 隔离 |
 | 保险库 | `/api/secrets`（GET 列表 / POST 创建 / GET+DELETE 单条，AES-256-GCM 加密）；`SUPEROPS_MASTER_KEY` 未配置或非 32 字节 → 全部接口 503；密文值不入日志 |
-| 录制 | exec WebSocket 帧旁路写入 ClickHouse `exec_session`；`/api/recordings`（GET 列表）、`/api/recordings/{sid}/frames`（GET，上限 5000 帧）、`/api/recordings/{sid}`（DELETE），read api:read / write api:write |
+| 录制 | exec WebSocket 帧旁路写入 ClickHouse `exec_session`（帧含会话级 seq 序号，回放按 timestamp, seq 定序）；`/api/recordings`（GET 列表）、`/api/recordings/{sid}/frames`（GET，上限 5000 帧）、`/api/recordings/{sid}`（DELETE），read api:read / write api:write；`recording.enabled` 配置开关（默认开启） |
 | 文件 | `POST /api/files`（multipart 10MB 上限，文件名白名单）+ `GET /api/files/{name}`，MinIO 存储，api:write/api:read |
 | 告警中心 | `GET /api/alerts?level=&limit=50`（ClickHouse `alert_event`，ops:cmdb）、`POST /api/alerts/{id}/ack`（api:write，幂等）、`GET /api/alerts/acks` |
 | 指标看板 | 前端 `/ops/metrics` 复用 `GET /api/v1/metrics/query`（api:read） |
@@ -180,7 +180,7 @@ cd frontend && npm install && npm run dev    # http://localhost:3000
 
 ## 测试与 CI
 
-- workspace 单测/集成测试 358 项全过（gateway 71 / k8s 14 / collector 31 / ecat 组件，见 `docs/audit-report-2026-08-06.md` 测试矩阵）
+- workspace 单测/集成测试 361 项全过（gateway 73 / k8s 14 / collector 32 / ecat 组件，见 `docs/audit-report-2026-08-06.md` 测试矩阵）
 - 端到端与安全验证：登录/注册、k8s 路由正误路径、认证绕过、JWT 伪造、限流 429、熔断 503、API Key 生命周期（见 `docs/audit-report-2026-08-06.md`）
 - 运行时验证：Consul 注册/注销、KV 热更新（阈值 3↔10 双向生效）、Jaeger span、Prometheus target up
 - CI（`.github/workflows/ci.yml`）：`cargo fmt --check` + `cargo check` + `cargo test` + `npm run build`
@@ -192,6 +192,8 @@ cd frontend && npm install && npm run dev    # http://localhost:3000
 - **审批开关**：`approval.enabled` 默认关闭（`config/gateway.yaml`），开启后删除 deployment 需先提交并审批通过 delete 审批单（412 门禁）
 - **exec 终端**：需真实 k8s 集群，且角色需 operator+（写路由 require_role("api:write")）；无集群时返回明确错误帧
 - **OTLP 覆盖**：gateway HTTP 路径 + k8s gRPC + collector 调度均接入 OTLP span；录制旁路写入等非阻塞路径无 resource 字段（非阻塞项）
+- **多租户**：tenant 由客户端 `x-tenant-id` 头断言（无服务端租户目录）；头缺失回落 `default`，存在但畸形返回 400（严格模式）
+- **录制开关**：`recording.enabled` 默认开启（`config/gateway.yaml`）；回放帧上限 5000（ORDER BY timestamp, seq）
 - **单实例部署**：限流计数为 Redis 共享，但服务本身单实例
 
 ## 文档

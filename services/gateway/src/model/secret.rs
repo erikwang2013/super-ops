@@ -2,12 +2,24 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use sqlx::mysql::MySqlPool;
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Serialize, Deserialize, FromRow)]
 pub struct SecretRow {
     pub id: i64,
     pub name: String,
     pub created_at: String,
     pub ciphertext: Vec<u8>,
+}
+
+// 手动 Debug：ciphertext 打码，避免日志意外泄露密文
+impl std::fmt::Debug for SecretRow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SecretRow")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("created_at", &self.created_at)
+            .field("ciphertext", &"[redacted]")
+            .finish()
+    }
 }
 
 pub async fn upsert_secret(

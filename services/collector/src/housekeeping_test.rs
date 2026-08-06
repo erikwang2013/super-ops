@@ -34,6 +34,16 @@ fn mem_gib_parse() {
 }
 
 #[test]
+fn non_finite_inputs_map_to_zero() {
+    // "NaN"/"Infinity" 能成功 parse 为 f64，若不做有限性守卫会以 NaN/Inf 静默污染 capacity 汇总
+    assert_eq!(parse_cpu_cores("NaN"), 0.0);
+    assert_eq!(parse_cpu_cores("Infinity"), 0.0);
+    assert_eq!(parse_mem_gib("NaN"), 0.0);
+    assert_eq!(parse_mem_gib("inf"), 0.0);
+    assert_eq!(parse_mem_gib("1e999Gi"), 0.0);
+}
+
+#[test]
 fn sh_quote_wraps_and_escapes() {
     assert_eq!(sh_quote("plain"), "'plain'");
     // 含单引号输入被转义, 无法闭合引号注入

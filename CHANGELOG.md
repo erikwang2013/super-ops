@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.5.1] — 2026-08-07 — 复审修复（审计报告 §8.5 闭环）
+
+### Fixed
+- 录制回放定序：recorder.rs 会话级帧序号（`bump_seq`，写入前取号），`exec_session` 新增 `seq` 列，回放 `ORDER BY timestamp, seq`；`GET /api/recordings/{sid}/frames` 返回 `seq` 字段
+- 录制开关：config 新增 `recording.enabled`（默认 true 保持旧行为，`config/gateway.yaml` 同步）
+- 多租户严格化：`x-tenant-id` 存在但畸形（非 UTF-8/非法字符/超长）→ 400，缺失头仍回落 `default`；`users.tenant_id` 列接线（User/UserRow/list_users/create，注册恒 `'default'`），移除死列
+- 保险库加固：vault.rs `cipher()` 主密钥 32 字节长度校验（`Key::from_slice` panic → Err，503 两态语义不变）；SecretRow 手动 Debug 密文打码（`[redacted]`）
+- housekeeping：`parse_cpu_cores`/`parse_mem_gib` 非有限值（NaN/Inf）守卫 → 0.0，杜绝静默污染 capacity 汇总；备份目录不可读 → warn 而非静默；mysqldump 管道失败删除半成品 `.sql.gz`
+- 文件拆分合规：main.rs 602→186 行（路由组迁至 routes.rs 374 行）、k8s_proxy.rs 548→418 行（+k8s_exec.rs 139 行）；`create_dir_all` 启动期 fail-soft（创建失败仅 warn 降级）
+- 验证：workspace **361 项测试全过（0 失败）**、`cargo fmt --check`/`cargo check`/`npm run build` 全绿
+
 ## [1.5.0] — 2026-08-06 — SuperOps P6 治理与运维闭环
 
 ### Added

@@ -104,7 +104,7 @@ super-ops/
 | Approvals | deletion gate for deployments (412 without an approved request when `approval.enabled`); `GET/POST /api/approvals` (kind=delete, target `"{cluster_id}/{ns}/{name}"`), `POST /api/approvals/{id}/decide`; **off by default** |
 | Multi-tenancy | `x-tenant-id` header parsed by `require_tenant` middleware (lowercase alnum/dash 1..=64, falls back to `default`); cmdb/scripts data filtered by `tenant_id` |
 | Vault | `/api/secrets` (GET list / POST create / GET+DELETE single, AES-256-GCM); all endpoints return 503 without a valid `SUPEROPS_MASTER_KEY` (32 bytes); ciphertext never logged |
-| Recordings | exec WebSocket frames mirrored to ClickHouse `exec_session` (side channel); `/api/recordings` (GET list), `/api/recordings/{sid}/frames` (GET, up to 5000 frames), `/api/recordings/{sid}` (DELETE); read api:read / write api:write |
+| Recordings | exec WebSocket frames mirrored to ClickHouse `exec_session` (side channel; frames carry a per-session seq, replay ordered by timestamp, seq); `/api/recordings` (GET list), `/api/recordings/{sid}/frames` (GET, up to 5000 frames), `/api/recordings/{sid}` (DELETE); read api:read / write api:write; `recording.enabled` config switch (on by default) |
 | Files | `POST /api/files` (multipart, 10MB limit, filename whitelist) + `GET /api/files/{name}`, stored in MinIO, api:write/api:read |
 | Alert center | `GET /api/alerts?level=&limit=50` (ClickHouse `alert_event`, ops:cmdb), `POST /api/alerts/{id}/ack` (api:write, idempotent), `GET /api/alerts/acks` |
 | Metrics page | frontend `/ops/metrics` reuses `GET /api/v1/metrics/query` (api:read) |
@@ -180,7 +180,7 @@ Infra passwords are injected via `deploy/.env` (template: `deploy/.env.example`)
 
 ## Tests & CI
 
-- 358 workspace unit/integration tests, all passing (gateway 71 / k8s 14 / collector 31 / ecat crates; see the test matrix in `docs/audit-report-2026-08-06.md`)
+- 361 workspace unit/integration tests, all passing (gateway 73 / k8s 14 / collector 32 / ecat crates; see the test matrix in `docs/audit-report-2026-08-06.md`)
 - E2E & security: login/register, k8s route happy & error paths, auth bypass, JWT forgery, 429 rate limit, 503 breaker, API Key lifecycle (see `docs/audit-report-2026-08-06.md`)
 - Runtime checks: Consul register/deregister, KV hot reload (threshold 3↔10 both ways), Jaeger spans, Prometheus target up
 - CI (`.github/workflows/ci.yml`): `cargo fmt --check` + `cargo check` + `cargo test` + `npm run build`
@@ -192,6 +192,8 @@ Infra passwords are injected via `deploy/.env` (template: `deploy/.env.example`)
 - **Approval switch**: `approval.enabled` is off by default (`config/gateway.yaml`); when enabled, deleting a deployment requires a submitted and approved delete request (412 gate)
 - **exec terminal**: needs a real k8s cluster and role operator+ (write route require_role("api:write")); without a cluster, clients get an explicit error frame
 - **OTLP coverage**: gateway HTTP + k8s gRPC + collector scheduler spans are wired; non-blocking side paths (e.g. recording mirror) carry no resource field (accepted, non-blocking)
+- **Multi-tenancy**: tenant is asserted from the client-supplied `x-tenant-id` header (no server-side tenant directory); missing header falls back to `default`, present-but-malformed returns 400 (strict mode)
+- **Recording switch**: `recording.enabled` is on by default (`config/gateway.yaml`); replay is capped at 5000 frames (ORDER BY timestamp, seq)
 - **Single-instance deployment**: rate-limit counters are shared via Redis, but services themselves run as single instances
 
 ## Docs

@@ -21,12 +21,27 @@ pub struct Config {
     pub oauth2: Option<OAuth2Config>,
     #[serde(default)]
     pub approval: ApprovalConfig,
+    #[serde(default)]
+    pub recording: RecordingConfig,
 }
 
 #[derive(Debug, Deserialize, Clone, Default)]
 pub struct ApprovalConfig {
     /// 开启后删除 deployment 需先通过审批（approval 表有 approved 的 delete 单）。
     pub enabled: bool,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct RecordingConfig {
+    /// 终端录制开关：false 时 exec ws 不落 ClickHouse。
+    pub enabled: bool,
+}
+
+// 默认开启录制，保持旧行为；显式配置 recording.enabled: false 才关闭
+impl Default for RecordingConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -120,5 +135,15 @@ mod tests {
         let o = cfg.oauth2.unwrap();
         assert_eq!(o.introspection_url, "https://idp/oauth/introspect");
         assert_eq!(o.client_id, "cid");
+    }
+
+    #[test]
+    fn recording_defaults_to_enabled() {
+        let cfg: Config = serde_yaml::from_str(base_yaml()).unwrap();
+        assert!(cfg.recording.enabled);
+        let cfg: Config =
+            serde_yaml::from_str(&format!("{}recording:\n  enabled: false\n", base_yaml()))
+                .unwrap();
+        assert!(!cfg.recording.enabled);
     }
 }
