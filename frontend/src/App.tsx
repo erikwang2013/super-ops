@@ -17,6 +17,11 @@ import CmdbPage from './pages/cmdb';
 import ScriptsPage from './pages/ops/scripts';
 import AlertsPage from './pages/ops/alerts';
 import MetricsPage from './pages/ops/metrics';
+import LogsPage from './pages/ops/logs';
+import RecordingsPage from './pages/ops/recordings';
+import ApprovalsPage from './pages/ops/approvals';
+import SecretsPage from './pages/ops/secrets';
+import FilesPage from './pages/ops/files';
 
 const menuData = [
   { path: '/dashboard', name: '总览', icon: <DashboardOutlined /> },
@@ -30,6 +35,9 @@ const menuData = [
     { path: '/ops/audit', name: '审计中心' }, { path: '/ops/apikeys', name: 'API Keys' },
     { path: '/ops/users', name: '用户管理' }, { path: '/ops/scripts', name: '脚本库' },
     { path: '/ops/alerts', name: '告警中心' }, { path: '/ops/metrics', name: '指标看板' },
+    { path: '/ops/logs', name: '日志检索' }, { path: '/ops/recordings', name: '录制回放' },
+    { path: '/ops/approvals', name: '审批中心' }, { path: '/ops/secrets', name: '保险库' },
+    { path: '/ops/files', name: '文件管理' },
   ]},
 ];
 
@@ -45,9 +53,9 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/k8s/clusters" element={<ClustersPage />} />
           <Route path="/k8s/clusters/:id" element={<ClusterDetail />} />
-          <Route path="/k8s/pods" element={<PodsPage clusterId="default" />} />
-          <Route path="/k8s/deployments" element={<DeploymentsPage clusterId="default" />} />
-          <Route path="/k8s/nodes" element={<NodesPage clusterId="default" />} />
+          <Route path="/k8s/pods" element={<PodsPage />} />
+          <Route path="/k8s/deployments" element={<DeploymentsPage />} />
+          <Route path="/k8s/nodes" element={<NodesPage />} />
           <Route path="/k8s/terminal" element={<TerminalPage />} />
           <Route path="/cmdb" element={<CmdbPage />} />
           <Route path="/ops/audit" element={<AuditPage />} />
@@ -56,6 +64,11 @@ export default function App() {
           <Route path="/ops/scripts" element={<ScriptsPage />} />
           <Route path="/ops/alerts" element={<AlertsPage />} />
           <Route path="/ops/metrics" element={<MetricsPage />} />
+          <Route path="/ops/logs" element={<LogsPage />} />
+          <Route path="/ops/recordings" element={<RecordingsPage />} />
+          <Route path="/ops/approvals" element={<ApprovalsPage />} />
+          <Route path="/ops/secrets" element={<SecretsPage />} />
+          <Route path="/ops/files" element={<FilesPage />} />
         </Routes>
       </PageContainer>
     </ProLayout>

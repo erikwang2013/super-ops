@@ -77,7 +77,7 @@ super-ops/
 │           ├── housekeeping.rs #   治理：MySQL 备份 / 容量与成本估算
 │           └── events.rs      #    Kafka 审计事件消费
 ├── frontend/                  # React + Vite + Tauri 2（:3000）
-│   └── src/pages/            #  k8s（集群/Pod/Node/终端/日志）+ cmdb + ops（审计/API Keys/用户/脚本/告警/指标）
+│   └── src/pages/            #  k8s（集群/Pod/Node/终端/日志）+ cmdb + ops（审计/API Keys/用户/脚本/告警/指标/日志检索/录制/审批/保险库/文件）
 ├── ecat-*/                    # e-cat 框架组件（workspace 成员）
 ├── superops-protos/           # protobuf 生成代码（common.v1 / k8s.v1）
 ├── protos/                    # proto 源文件（buf 管理）
@@ -119,7 +119,7 @@ super-ops/
 按调度周期采集指标 → ClickHouse 快照；日志采集（logtail.rs：周期采集 Pod 日志 → ClickHouse）；巡检任务经 Redis 锁保证单实例执行；告警规则（连续 N 次超标）写入事件；告警通知（generic/钉钉/企微 webhook + 按目标静默窗口，默认 300s）；治理任务（housekeeping.rs：MySQL 备份 + 容量/成本估算）；Kafka 审计事件消费（ecat-mq-kafka）；OTLP span 导出。
 
 ### Frontend（:3000）
-登录、集群列表/详情、Pod 列表与日志、Deployment、Node、终端页（WS 双向流，token query 鉴权、binaryType 处理、可选容器）；dashboard 三个卡片接入真实接口（集群数 / Docker 主机数（metrics query，临时指标 app）/ 活跃告警（P6 起接告警中心接口））；CMDB 资产页（`/cmdb`，ProTable + 新建弹窗，菜单位于 Kubernetes 与运维中心之间）；脚本库页（`/ops/scripts`，脚本列表 + 运行记录双 ProTable）；运维中心（`/ops/audit` 审计、`/ops/apikeys` API Key、`/ops/users` 用户管理、`/ops/alerts` 告警中心（10s 轮询 + 确认）、`/ops/metrics` 指标看板（复用 metrics query））。
+登录、集群列表/详情、Pod 列表与日志、Deployment、Node、终端页（WS 双向流，token query 鉴权、binaryType 处理、可选容器）；dashboard 三个卡片接入真实接口（集群数 / Docker 主机数（metrics query，临时指标 app）/ 活跃告警（P6 起接告警中心接口））；CMDB 资产页（`/cmdb`，ProTable + 新建弹窗，菜单位于 Kubernetes 与运维中心之间）；脚本库页（`/ops/scripts`，脚本列表 + 运行记录双 ProTable）；运维中心（`/ops/audit` 审计、`/ops/apikeys` API Key、`/ops/users` 用户管理、`/ops/alerts` 告警中心（10s 轮询 + 确认）、`/ops/metrics` 指标看板（复用 metrics query）、`/ops/logs` 日志检索（条件 + 时间范围）、`/ops/recordings` 录制回放（帧按 seq 定序）、`/ops/approvals` 审批中心（状态过滤 + 通过/拒绝/取消/reopen）、`/ops/secrets` 保险库（加密存储 + 解密查看/复制，主密钥未配置时展示 503 提示）、`/ops/files` 文件管理（multipart 上传 / 按名下载））；Pods/Deployments/Nodes 独立页带集群选择器（默认首个集群，不再硬编码 `default`；集群详情页内嵌场景不受影响）。
 
 ### API 一览（OpenAPI 见 /api/docs）
 `/api/auth/register|login`、`/api/keys`（CRUD）、`/api/users`（`PATCH /{id}/status` 启用/禁用）、`/api/audit/events`（审计查询，limit/offset/level）、`/api/logs/search`（日志检索）、`/api/cmdb/assets`（GET/POST）、`/api/cmdb/stats`（GET）、`/api/cmdb/assets/{id}`（DELETE）、`/api/scripts`（GET/POST）、`/api/scripts/{id}`（DELETE）、`/api/scripts/{id}/run`（POST）、`/api/scripts/runs`（GET）、`/api/approvals`（GET/POST，delete 审批门禁）、`/api/approvals/{id}/decide`（POST）、`/api/secrets`（GET/POST）、`/api/secrets/{name}`（GET/DELETE）、`/api/recordings`（GET）、`/api/recordings/{sid}`（DELETE）、`/api/recordings/{sid}/frames`（GET）、`/api/files`（POST 上传）、`/api/files/{name}`（GET 下载）、`/api/alerts`（GET，level/limit）、`/api/alerts/{id}/ack`（POST）、`/api/alerts/acks`（GET）、`/api/k8s/clusters[/{id}][/pods|/deployments|/nodes|/metrics]`、`/api/k8s/clusters/{id}/pods/{ns}/{pod}/logs|exec`、`/api/k8s/clusters/{id}/deployments/{ns}/{name}/scale|restart`（`DELETE` 删除）、`/api/v1/metrics/query`、`/api/health`、`/api/docs`。

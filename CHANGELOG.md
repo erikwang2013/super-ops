@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.2] — 2026-08-07 — 前端功能补齐（生态缺口 A 类 + 多集群）
+
+### Added
+- 日志检索页 `/ops/logs`：namespace/pod/关键字 + 时间范围（RangePicker → unix 秒 from/to），结果 ProTable 展示（最多 100 条）
+- 录制回放页 `/ops/recordings`：录制列表（会话 ID/开始时间/帧数）、回放 Modal（帧按 seq 排序，base64 → UTF-8 解码，播放/暂停/显示全部）、删除
+- 审批中心页 `/ops/approvals`：按状态过滤、新建审批单（kind/target/reason）、pending→通过/拒绝/取消、rejected→重新打开
+- 保险库页 `/ops/secrets`：列表/新建（name 正则校验）/查看（解密值 + 复制）/删除；master key 未配置时展示不可用提示（503 错误回显）
+- 文件管理页 `/ops/files`：multipart 上传（Dragger）、本会话已上传快速下载、按文件名下载（后端无列表 API，未补后端）
+- 多集群修复：Pods/Deployments/Nodes 独立页（`/k8s/pods|deployments|nodes`）移除 `clusterId="default"` 硬编码，新增集群选择器（`cluster-select.tsx`，默认首个集群）；ClusterDetail 内嵌页不受影响
+- 前端 API 层扩展：`services/api.ts` 新增 `logApi`/`recordingApi`/`approvalApi`/`secretApi`/`fileApi`（fileApi 走原生 fetch multipart/字节流，不经 JSON 包装）
+
+### Changed
+- 运维中心菜单新增 5 项：日志检索 / 录制回放 / 审批中心 / 保险库 / 文件管理
+
 ## [1.5.1] — 2026-08-07 — 复审修复（审计报告 §8.5 闭环）
 
 ### Fixed

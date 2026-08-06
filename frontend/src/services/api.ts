@@ -86,4 +86,86 @@ export const alertApi = {
   ackAlert: (id: number) => api.post<{ ok: boolean }>(`/alerts/${id}/ack`, {}),
   listAcks: () => api.get<{ ids: number[] }>('/alerts/acks'),
 };
+
+// ---- 日志检索 ----
+export interface LogRow { namespace: string; pod: string; content: string; ts: string; }
+export interface LogSearchParams {
+  namespace?: string; pod?: string; keyword?: string; from?: number; to?: number; limit?: number;
+}
+
+export const logApi = {
+  searchLogs: (p: LogSearchParams) => {
+    const qs = [
+      p.namespace ? `namespace=${encodeURIComponent(p.namespace)}` : '',
+      p.pod ? `pod=${encodeURIComponent(p.pod)}` : '',
+      p.keyword ? `keyword=${encodeURIComponent(p.keyword)}` : '',
+      p.from ? `from=${p.from}` : '',
+      p.to ? `to=${p.to}` : '',
+      `limit=${p.limit || 100}`,
+    ].filter(Boolean).join('&');
+    return api.get<{ logs: LogRow[] }>(`/logs/search?${qs}`);
+  },
+};
+
+// ---- 终端录制 ----
+export interface RecordingRow { session_id: string; created_at: number; frames: number; }
+export interface FrameRow { ts: number; seq: number; data: string; }
+
+export const recordingApi = {
+  listRecordings: (limit = 50) =>
+    api.get<{ recordings: RecordingRow[] }>(`/recordings?limit=${limit}`),
+  getFrames: (sid: string) =>
+    api.get<{ session_id: string; frames: FrameRow[] }>(`/recordings/${sid}/frames`),
+  deleteRecording: (sid: string) => api.delete<undefined>(`/recordings/${sid}`),
+};
+
+// ---- 审批 ----
+export interface ApprovalRow {
+  id: number; kind: string; target: string; operator: string; reason: string;
+  status: string; created_at: string; decided_by?: string; decided_at?: string;
+}
+
+export const approvalApi = {
+  listApprovals: (status?: string, limit = 50) =>
+    api.get<{ approvals: ApprovalRow[] }>(`/approvals?status=${status || ''}&limit=${limit}`),
+  createApproval: (body: { kind: string; target: string; reason?: string }) =>
+    api.post<{ id: number; status: string }>('/approvals', body),
+  decideApproval: (id: number, action: string) =>
+    api.post<ApprovalRow>(`/approvals/${id}/decide`, { action }),
+};
+
+// ---- 保险库 ----
+export interface SecretRow { name: string; created_at: string; }
+
+export const secretApi = {
+  listSecrets: () => api.get<SecretRow[]>('/secrets'),
+  createSecret: (name: string, value: string) =>
+    api.post<{ name: string; created_at: string }>('/secrets', { name, value }),
+  getSecret: (name: string) =>
+    api.get<{ value: string }>(`/secrets/${encodeURIComponent(name)}`),
+  deleteSecret: (name: string) => api.delete<undefined>(`/secrets/${encodeURIComponent(name)}`),
+};
+
+// ---- 文件（multipart 上传 / 原始字节下载，不走 JSON 包装） ----
+export const fileApi = {
+  upload: async (file: File): Promise<{ name: string }> => {
+    const token = useAuthStore.getState().token;
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`${BASE_URL}/files`, {
+      method: 'POST', body: fd,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new ApiError((await res.json().catch(() => ({}))).error || '上传失败', res.status);
+    return res.json();
+  },
+  download: async (name: string): Promise<Blob> => {
+    const token = useAuthStore.getState().token;
+    const res = await fetch(`${BASE_URL}/files/${encodeURIComponent(name)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new ApiError((await res.json().catch(() => ({}))).error || '下载失败', res.status);
+    return res.blob();
+  },
+};
 export { ApiError };
