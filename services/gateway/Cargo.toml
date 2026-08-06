@@ -20,6 +20,7 @@ ecat-registry-consul = { path = "../../ecat-registry-consul" }
 ecat-config = { path = "../../ecat-config" }
 ecat-config-remote = { path = "../../ecat-config-remote" }
 ecat-middleware = { path = "../../ecat-middleware", features = ["redis"] }
+redis = { version = "0.27", features = ["tokio-comp", "aio"] }
 ecat-tracing-otlp = { path = "../../ecat-tracing-otlp" }
 ecat-auth = { path = "../../ecat-auth" }
 ecat-openapi = { path = "../../ecat-openapi" }
@@ -29,18 +30,21 @@ ecat-metrics = { path = "../../ecat-metrics" }
 prometheus = "0.13"
 tonic.workspace = true
 prost.workspace = true
-axum = { workspace = true, features = ["ws"] }
+axum = { workspace = true, features = ["ws", "multipart"] }
 tokio.workspace = true
 tower.workspace = true
 futures = "0.3"
 tokio-stream = "0.1"
 sha2 = "0.10"
+aes-gcm = "0.10"
+rand = "0.8"
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 anyhow = "1"
 serde_yaml = "0.9"
+base64 = "0.22"
 bcrypt = "0.15"
 uuid = { version = "1", features = ["v4"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "mysql", "chrono", "uuid"] }

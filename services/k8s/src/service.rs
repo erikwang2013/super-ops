@@ -10,7 +10,8 @@ use superops_protos::k8s::v1::{
     GetMetricsRequest, GetMetricsResponse, GetPodLogsRequest, ListClustersRequest,
     ListClustersResponse, ListDeploymentsRequest, ListDeploymentsResponse, ListNodesRequest,
     ListNodesResponse, ListPodsRequest, ListPodsResponse, LogLine, RemoveClusterRequest,
-    RemoveClusterResponse, WatchEvent, WatchResourcesRequest, k8s_service_server::K8sService,
+    RemoveClusterResponse, RunJobRequest, RunJobResponse, WatchEvent, WatchResourcesRequest,
+    k8s_service_server::K8sService,
 };
 
 use crate::cluster::manager::ClusterManager;
@@ -89,6 +90,7 @@ impl K8sService for K8sServiceImpl {
         Ok(Response::new(RemoveClusterResponse {}))
     }
 
+    #[tracing::instrument(skip(self, request))]
     async fn list_pods(&self, request: Request<ListPodsRequest>) -> GrpcResult<ListPodsResponse> {
         let req = request.into_inner();
         let client = self
@@ -148,6 +150,97 @@ impl K8sService for K8sServiceImpl {
         }))
     }
 
+    async fn scale_deployment(
+        &self,
+        request: Request<superops_protos::k8s::v1::ScaleDeploymentRequest>,
+    ) -> GrpcResult<superops_protos::k8s::v1::ScaleDeploymentResponse> {
+        let req = request.into_inner();
+        resource::write::validate_scale(&req.cluster_id, &req.namespace, &req.name, req.replicas)
+            .map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let client = self
+            .manager
+            .get(&req.cluster_id)
+            .map_err(|e| Status::not_found(e.to_string()))?;
+        let replicas =
+            resource::write::scale_deployment(&client, &req.namespace, &req.name, req.replicas)
+                .await
+                .map_err(|e| Status::internal(e.to_string()))?;
+        Ok(Response::new(
+            superops_protos::k8s::v1::ScaleDeploymentResponse { replicas },
+        ))
+    }
+
+    async fn restart_deployment(
+        &self,
+        request: Request<superops_protos::k8s::v1::RestartDeploymentRequest>,
+    ) -> GrpcResult<superops_protos::k8s::v1::RestartDeploymentResponse> {
+        let req = request.into_inner();
+        if req.cluster_id.is_empty() || req.namespace.is_empty() || req.name.is_empty() {
+            return Err(Status::invalid_argument(
+                "cluster_id/namespace/name must not be empty",
+            ));
+        }
+        let client = self
+            .manager
+            .get(&req.cluster_id)
+            .map_err(|e| Status::not_found(e.to_string()))?;
+        let restarted = resource::write::restart_deployment(&client, &req.namespace, &req.name)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+        Ok(Response::new(
+            superops_protos::k8s::v1::RestartDeploymentResponse { restarted },
+        ))
+    }
+
+    async fn delete_deployment(
+        &self,
+        request: Request<superops_protos::k8s::v1::DeleteDeploymentRequest>,
+    ) -> GrpcResult<superops_protos::k8s::v1::DeleteDeploymentResponse> {
+        let req = request.into_inner();
+        if req.cluster_id.is_empty() || req.namespace.is_empty() || req.name.is_empty() {
+            return Err(Status::invalid_argument(
+                "cluster_id/namespace/name must not be empty",
+            ));
+        }
+        let client = self
+            .manager
+            .get(&req.cluster_id)
+            .map_err(|e| Status::not_found(e.to_string()))?;
+        let deleted = resource::write::delete_deployment(&client, &req.namespace, &req.name)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+        Ok(Response::new(
+            superops_protos::k8s::v1::DeleteDeploymentResponse { deleted },
+        ))
+    }
+
+    async fn run_job(&self, request: Request<RunJobRequest>) -> GrpcResult<RunJobResponse> {
+        let req = request.into_inner();
+        resource::job::validate_job(
+            &req.cluster_id,
+            &req.namespace,
+            &req.job_name,
+            &req.image,
+            &req.command,
+        )
+        .map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let client = self
+            .manager
+            .get(&req.cluster_id)
+            .map_err(|e| Status::not_found(e.to_string()))?;
+        resource::job::run_job(
+            &client,
+            &req.namespace,
+            &req.job_name,
+            &req.image,
+            &req.command,
+            req.timeout_s,
+        )
+        .await
+        .map_err(|e| Status::internal(e.to_string()))?;
+        Ok(Response::new(RunJobResponse { created: true }))
+    }
+
     async fn list_nodes(
         &self,
         request: Request<ListNodesRequest>,
@@ -193,6 +286,7 @@ impl K8sService for K8sServiceImpl {
 
     type WatchResourcesStream = ReceiverStream<Result<WatchEvent, Status>>;
 
+    #[tracing::instrument(skip(self, request))]
     async fn watch_resources(
         &self,
         request: Request<WatchResourcesRequest>,
@@ -247,6 +341,7 @@ impl K8sService for K8sServiceImpl {
 
     type GetPodLogsStream = ReceiverStream<Result<LogLine, Status>>;
 
+    #[tracing::instrument(skip(self, request))]
     async fn get_pod_logs(
         &self,
         request: Request<GetPodLogsRequest>,
@@ -292,6 +387,7 @@ impl K8sService for K8sServiceImpl {
 
     type ExecPodStream = ReceiverStream<Result<superops_protos::k8s::v1::ExecResponse, Status>>;
 
+    #[tracing::instrument(skip(self, request))]
     async fn exec_pod(
         &self,
         request: Request<tonic::Streaming<superops_protos::k8s::v1::ExecRequest>>,
@@ -487,6 +583,70 @@ mod tests {
             ..Default::default()
         }]));
         let err = svc.exec_pod(req).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::NotFound);
+    }
+
+    #[tokio::test]
+    async fn scale_deployment_invalid_replicas_is_invalid_argument() {
+        let svc = K8sServiceImpl {
+            manager: ClusterManager::new(),
+        };
+        let req = Request::new(superops_protos::k8s::v1::ScaleDeploymentRequest {
+            cluster_id: "c".into(),
+            namespace: "ns".into(),
+            name: "d".into(),
+            replicas: 2000,
+        });
+        let err = svc.scale_deployment(req).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+    }
+
+    #[tokio::test]
+    async fn scale_deployment_unknown_cluster_is_not_found() {
+        let svc = K8sServiceImpl {
+            manager: ClusterManager::new(),
+        };
+        let req = Request::new(superops_protos::k8s::v1::ScaleDeploymentRequest {
+            cluster_id: "nope".into(),
+            namespace: "ns".into(),
+            name: "d".into(),
+            replicas: 3,
+        });
+        let err = svc.scale_deployment(req).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::NotFound);
+    }
+
+    #[tokio::test]
+    async fn run_job_empty_cluster_is_invalid_argument() {
+        let svc = K8sServiceImpl {
+            manager: ClusterManager::new(),
+        };
+        let req = Request::new(RunJobRequest {
+            cluster_id: "".into(),
+            namespace: "ns".into(),
+            job_name: "job-1".into(),
+            image: "busybox:1.36".into(),
+            command: "echo hi".into(),
+            timeout_s: 300,
+        });
+        let err = svc.run_job(req).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+    }
+
+    #[tokio::test]
+    async fn run_job_unknown_cluster_is_not_found() {
+        let svc = K8sServiceImpl {
+            manager: ClusterManager::new(),
+        };
+        let req = Request::new(RunJobRequest {
+            cluster_id: "nope".into(),
+            namespace: "ns".into(),
+            job_name: "job-1".into(),
+            image: "busybox:1.36".into(),
+            command: "echo hi".into(),
+            timeout_s: 300,
+        });
+        let err = svc.run_job(req).await.unwrap_err();
         assert_eq!(err.code(), tonic::Code::NotFound);
     }
 }

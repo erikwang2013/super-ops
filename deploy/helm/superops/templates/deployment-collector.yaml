@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: superops-collector
+spec:
+  replicas: {{ .Values.replicas.collector }}
+  selector:
+    matchLabels:
+      app: superops-collector
+  template:
+    metadata:
+      labels:
+        app: superops-collector
+    spec:
+      containers:
+        - name: collector
+          image: "{{ .Values.image.repository }}/collector:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: superops-config

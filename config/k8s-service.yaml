@@ -7,4 +7,5 @@ database:
 consul:
   address: "http://localhost:8500"
 
+# P6-6: OTLP 端点（扁平字符串，gateway/k8s/collector 三服务导出）
 otlp: "http://localhost:4317"

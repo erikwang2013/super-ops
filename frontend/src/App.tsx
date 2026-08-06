@@ -1,6 +1,6 @@
 import { ProLayout, PageContainer } from '@ant-design/pro-components';
 import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
-import { DashboardOutlined, CloudServerOutlined } from '@ant-design/icons';
+import { DashboardOutlined, CloudServerOutlined, DatabaseOutlined, SettingOutlined } from '@ant-design/icons';
 import { useAuthStore } from './stores/auth';
 import LoginPage from './pages/login';
 import Dashboard from './pages/dashboard';
@@ -10,6 +10,13 @@ import PodsPage from './pages/k8s/pods';
 import DeploymentsPage from './pages/k8s/deployments';
 import NodesPage from './pages/k8s/nodes';
 import TerminalPage from './pages/k8s/terminal';
+import AuditPage from './pages/ops/audit';
+import ApiKeysPage from './pages/ops/apikeys';
+import UsersPage from './pages/ops/users';
+import CmdbPage from './pages/cmdb';
+import ScriptsPage from './pages/ops/scripts';
+import AlertsPage from './pages/ops/alerts';
+import MetricsPage from './pages/ops/metrics';
 
 const menuData = [
   { path: '/dashboard', name: '总览', icon: <DashboardOutlined /> },
@@ -17,6 +24,12 @@ const menuData = [
     { path: '/k8s/clusters', name: '集群管理' }, { path: '/k8s/pods', name: 'Pods' },
     { path: '/k8s/deployments', name: 'Deployments' }, { path: '/k8s/nodes', name: 'Nodes' },
     { path: '/k8s/terminal', name: 'Web Terminal' },
+  ]},
+  { path: '/cmdb', name: 'CMDB 资产', icon: <DatabaseOutlined /> },
+  { path: '/ops', name: '运维中心', icon: <SettingOutlined />, children: [
+    { path: '/ops/audit', name: '审计中心' }, { path: '/ops/apikeys', name: 'API Keys' },
+    { path: '/ops/users', name: '用户管理' }, { path: '/ops/scripts', name: '脚本库' },
+    { path: '/ops/alerts', name: '告警中心' }, { path: '/ops/metrics', name: '指标看板' },
   ]},
 ];
 
@@ -36,6 +49,13 @@ export default function App() {
           <Route path="/k8s/deployments" element={<DeploymentsPage clusterId="default" />} />
           <Route path="/k8s/nodes" element={<NodesPage clusterId="default" />} />
           <Route path="/k8s/terminal" element={<TerminalPage />} />
+          <Route path="/cmdb" element={<CmdbPage />} />
+          <Route path="/ops/audit" element={<AuditPage />} />
+          <Route path="/ops/apikeys" element={<ApiKeysPage />} />
+          <Route path="/ops/users" element={<UsersPage />} />
+          <Route path="/ops/scripts" element={<ScriptsPage />} />
+          <Route path="/ops/alerts" element={<AlertsPage />} />
+          <Route path="/ops/metrics" element={<MetricsPage />} />
         </Routes>
       </PageContainer>
     </ProLayout>

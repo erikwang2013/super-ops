@@ -3,6 +3,7 @@ use crate::config::Config;
 use superops_protos::k8s::v1::k8s_service_client::K8sServiceClient;
 use superops_protos::k8s::v1::{ListDeploymentsRequest, ListNodesRequest, ListPodsRequest};
 
+#[tracing::instrument(skip_all)]
 pub async fn collect_once(cfg: &Config) -> anyhow::Result<()> {
     let mut client = K8sServiceClient::connect(cfg.k8s.endpoint.clone()).await?;
     let nodes = client

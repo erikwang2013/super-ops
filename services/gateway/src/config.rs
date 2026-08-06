@@ -19,6 +19,14 @@ pub struct Config {
     pub otlp: Option<String>,
     #[serde(default)]
     pub oauth2: Option<OAuth2Config>,
+    #[serde(default)]
+    pub approval: ApprovalConfig,
+}
+
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct ApprovalConfig {
+    /// 开启后删除 deployment 需先通过审批（approval 表有 approved 的 delete 单）。
+    pub enabled: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]

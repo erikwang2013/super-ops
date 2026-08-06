@@ -87,6 +87,7 @@ pub fn health_to_points(events: &[AlertEvent], ts: i64) -> Vec<DataPoint> {
         .collect()
 }
 
+#[tracing::instrument(skip_all)]
 pub async fn inspect_once(cfg: &Config) -> anyhow::Result<()> {
     let lock = RedisLock::from_config(cfg.lock.clone())
         .await
@@ -125,5 +126,28 @@ async fn inspect_work(cfg: &Config) -> anyhow::Result<()> {
     let ch = clickhouse_from(cfg)?;
     let points = health_to_points(&health.alerts, now_secs());
     ecat_data::TsdbClient::write(ch.as_ref(), &points).await?;
+
+    let http = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap_or_default();
+    for t in &cfg.notify.targets {
+        let mut silencer = crate::notify::NotifySilencer::default();
+        let fresh: Vec<AlertEvent> = health
+            .alerts
+            .iter()
+            .filter(|e| {
+                let key = format!("{}:{}", e.title, e.node.as_deref().unwrap_or(""));
+                silencer.should_send(&key, cfg.notify.silence_secs)
+            })
+            .cloned()
+            .collect();
+        if fresh.is_empty() {
+            continue;
+        }
+        if let Err(e) = crate::notify::dispatch(t, &fresh, &http).await {
+            tracing::warn!("notify target {} failed: {e}", t.name);
+        }
+    }
     Ok(())
 }

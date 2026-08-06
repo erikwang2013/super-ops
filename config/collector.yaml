@@ -16,3 +16,30 @@ collector:
 
 consul:
   address: "http://localhost:8500"
+
+# P6-6: OTLP 端点（扁平字符串，gateway/k8s/collector 三服务导出）
+otlp: "http://localhost:4317"
+
+notify:
+  silence_secs: 300
+  targets: []
+
+logtail:
+  enabled: false
+  namespaces: ["default"]
+  tail_lines: 200
+  max_line_bytes: 1024
+  interval_secs: 30
+
+# P6-4: 治理任务 — MySQL 备份（mysqldump → backup_dir，保留 BACKUP_KEEP 份）+ 容量/成本估算
+housekeeping:
+  enabled: true
+  interval_secs: 86400
+
+mysql:
+  host: "localhost"
+  port: 3307
+  user: "root"
+  password: "root123"
+  database: "superops"
+  backup_dir: "data/backups"

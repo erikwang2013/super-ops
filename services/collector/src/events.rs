@@ -14,6 +14,8 @@ pub struct AuditEvent {
     pub ts: i64,
     pub event_type: String,
     #[serde(default)]
+    pub level: String,
+    #[serde(default)]
     pub username: String,
     #[serde(default)]
     pub ip: String,
@@ -26,6 +28,7 @@ pub fn audit_to_data_point(e: &AuditEvent) -> DataPoint {
         .with_tag("event_type", e.event_type.clone())
         .with_tag("username", e.username.clone())
         .with_tag("ip", e.ip.clone())
+        .with_tag("level", e.level.clone())
         .with_field("detail", FieldValue::String(e.detail.clone()))
         .with_timestamp(if e.ts > 0 {
             e.ts

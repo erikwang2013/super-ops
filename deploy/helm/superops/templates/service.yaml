@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: superops-gateway
+spec:
+  type: ClusterIP
+  selector:
+    app: superops-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      appProtocol: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: superops-k8s
+spec:
+  type: ClusterIP
+  selector:
+    app: superops-k8s
+  ports:
+    - name: grpc
+      port: 9091
+      targetPort: 9091
+      appProtocol: grpc

@@ -9,6 +9,13 @@ use superops_collector::config::collector_config;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cfg = collector_config()?;
+    let _otlp = match &cfg.otlp {
+        Some(endpoint) => Some(
+            ecat_tracing_otlp::init("superops-collector", endpoint)
+                .map_err(|e| anyhow::anyhow!("otlp init: {e}"))?,
+        ),
+        None => None,
+    };
     tracing::info!(
         k8s = %cfg.k8s.endpoint,
         ch = %cfg.ch.base_url,
@@ -58,6 +65,36 @@ async fn main() -> anyhow::Result<()> {
                         async move {
                             if let Err(e) = superops_collector::alert::inspect_once(&cfg).await {
                                 tracing::warn!("inspect failed: {e}");
+                            }
+                        }
+                    },
+                );
+                let logtail_cfg = cfg.clone();
+                sched.lock().unwrap().every(
+                    Duration::from_secs(cfg.logtail.interval_secs),
+                    move || {
+                        let cfg = logtail_cfg.clone();
+                        async move {
+                            if cfg.logtail.enabled
+                                && let Err(e) =
+                                    superops_collector::logtail::collect_once(&cfg).await
+                            {
+                                tracing::warn!("logtail failed: {e}");
+                            }
+                        }
+                    },
+                );
+                let hk_cfg = cfg.clone();
+                sched.lock().unwrap().every(
+                    Duration::from_secs(cfg.housekeeping.interval_secs),
+                    move || {
+                        let cfg = hk_cfg.clone();
+                        async move {
+                            if cfg.housekeeping.enabled
+                                && let Err(e) =
+                                    superops_collector::housekeeping::housekeeping_once(&cfg).await
+                            {
+                                tracing::warn!("housekeeping failed: {e}");
                             }
                         }
                     },

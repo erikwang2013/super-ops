@@ -1,0 +1,10 @@
+安装：helm install superops .
+
+配置：通过 values.yaml 的 config 键注入 GATEWAY_CONFIG / K8S_CONFIG / COLLECTOR_CONFIG
+（各自对应服务读取的 YAML，见仓库 config/ 目录）。密码/密钥请用外部 Secret 注入
+（env 或 envFrom），切勿写入 configmap —— 本 chart 的 configmap 仅存非敏感配置。
+
+镜像：默认 registry.example.com/superops/*:1.2.0 仅为示例，请改为你自己的仓库
+（image.repository / image.tag）；本 chart 不构建、不推送任何镜像。
+
+升级：helm upgrade superops .

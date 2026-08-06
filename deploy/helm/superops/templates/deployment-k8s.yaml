@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: superops-k8s
+spec:
+  replicas: {{ .Values.replicas.k8s }}
+  selector:
+    matchLabels:
+      app: superops-k8s
+  template:
+    metadata:
+      labels:
+        app: superops-k8s
+    spec:
+      containers:
+        - name: k8s
+          image: "{{ .Values.image.repository }}/k8s:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: superops-config
+          ports:
+            - containerPort: 9091
+          livenessProbe:
+            tcpSocket:
+              port: 9091
+          readinessProbe:
+            tcpSocket:
+              port: 9091

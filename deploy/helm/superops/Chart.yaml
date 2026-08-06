@@ -1,0 +1,6 @@
+apiVersion: v2
+name: superops
+description: SuperOps 智能运维平台（gateway / k8s-service / collector）
+type: application
+version: 0.1.0
+appVersion: "1.2.0"

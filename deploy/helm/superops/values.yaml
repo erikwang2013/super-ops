@@ -1,0 +1,13 @@
+# 示例镜像仓库；构建/推送由用户自行决定
+image:
+  repository: registry.example.com/superops
+  tag: "1.2.0"
+  pullPolicy: IfNotPresent
+replicas:
+  gateway: 1
+  k8s: 1
+  collector: 1
+# 覆盖 configmap 的额外键值；密码仅经 env / Secret 注入，不落 configmap。
+# 键名须为服务实际读取的 env 名：GATEWAY_CONFIG / K8S_CONFIG / COLLECTOR_CONFIG，
+# 值即对应 YAML 文本（示例见 config/ 下 gateway.yaml、k8s-service.yaml、collector.yaml）。
+config: {}

@@ -1,5 +1,48 @@
 # Changelog
 
+## [1.5.0] — 2026-08-06 — SuperOps P6 治理与运维闭环
+
+### Added
+- 审批工作流：`POST /api/approvals`（kind=delete，target 约定 `"{cluster_id}/{ns}/{name}"`，避免跨集群同名绕过）、`GET /api/approvals`、`POST /api/approvals/{id}/decide`（pending→approved/rejected/canceled）；`delete_deployment` 门禁（`services/gateway/src/proxy/k8s_proxy.rs`，`approval.enabled` 时未审批删除返回 412）；config `approval:` 段默认关闭
+- 多租户：`x-tenant-id` 请求头 + `require_tenant` 中间件（仅允许小写字母/数字/连字符 1..=64，非法/缺失回落 `default`，无失败路径）；cmdb/scripts 查询按 `tenant_id` 过滤
+- 凭据保险库：`/api/secrets`（GET 列表 / POST 创建 / GET+DELETE 单条，AES-256-GCM 加密）；`SUPEROPS_MASTER_KEY` 未配置或非 32 字节时全部接口 503（两态可用），密文值不入日志
+- 治理任务（collector `housekeeping.rs`）：MySQL 备份（mysqldump → `data/backups`，保留 BACKUP_KEEP 份）、磁盘容量与成本估算上报；collector.yaml 新增 `housekeeping:` 配置段
+- 终端录制旁路（gateway `recorder.rs`）：exec WebSocket 帧异步写入 ClickHouse `exec_session`（kind=recording，busy/超时不阻塞主链路）；`/api/recordings`（GET 列表 / GET `{sid}/frames` / DELETE `{sid}`），read 路由 api:read、write 路由 api:write
+- 文件服务：`POST /api/files`（multipart，`DefaultBodyLimit` 10MB，文件名白名单校验）与 `GET /api/files/{name}`，MinIO 存储（bucket 自动创建）
+- 告警中心：`GET /api/alerts?level=&limit=50`（ClickHouse `alert_event`）、`POST /api/alerts/{id}/ack`、`GET /api/alerts/acks`；前端 `/ops/alerts` 页（10s 轮询 + 确认），dashboard 活跃告警卡片改接告警中心接口
+- 指标看板：前端 `/ops/metrics` 页复用 `GET /api/v1/metrics/query` 展示节点/Pod/Deployment 指标
+- OTLP 追踪扩展（P6-6）：collector 调度与 k8s gRPC 服务接入 OTLP span（ecat-tracing-otlp），config 改用扁平字符串 `otlp: "http://localhost:4317"`
+- Helm chart：`deploy/helm/superops/`（Chart.yaml / values.yaml / configmap + gateway/k8s/collector 三 Deployment + Service + NOTES，共 8 文件，仅提供未打包）
+- MinIO（compose）：`minio` 服务 9002(API)/9003(console)，`minio_data` volume；`deploy/.env.example` 追加 `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`（生产必改）
+
+### Changed
+- 端口表/结构文档同步：gateway gRPC 9090、MinIO 9002/9003、`deploy/helm/` 与 `deploy/prometheus.yml`
+- 已知边界更新：主密钥（`SUPEROPS_MASTER_KEY`）与审批开关（`approval.enabled`）默认关闭
+
+## [1.4.0] — 2026-08-06 — SuperOps P5 日志/CMDB/脚本库/RBAC
+
+### Added
+- 日志采集（collector `logtail.rs`）：周期采集 Pod 日志 → ClickHouse（按命名空间轮询，tail_lines / max_line_bytes 可配）
+- 日志检索 API：`GET /api/logs/search`（ClickHouse 查询，require_role("api:read")）
+- CMDB 资产：MySQL `cmdb_asset` 表 + `/api/cmdb/assets`（GET 列表 / POST 创建）、`/api/cmdb/assets/{id}`（DELETE）、`/api/cmdb/stats`（GET），require_role("ops:cmdb")；前端新增 `/cmdb` 页（ProTable + 新建弹窗，菜单位于 Kubernetes 与运维中心之间）
+- dashboard 真实数据：集群数 / Docker 主机数（metrics query，临时指标 app）/ 活跃告警（审计事件前 100 条计数，P6 替换为告警中心）三卡片接入真实接口
+- 脚本库：MySQL `script`/`script_run` 表 + `/api/scripts`（GET/POST）、`/api/scripts/{id}`（DELETE）、`/api/scripts/{id}/run`（POST）、`/api/scripts/runs`（GET），require_role("ops:scripts")，仅支持 shell（busybox:1.36）
+- k8s 批量执行：service 新增 gRPC `RunJob`（`services/k8s/src/resource/job.rs`，batch/v1 Job 创建）
+- 前端脚本库页：`/ops/scripts`（脚本列表 + 运行记录双 ProTable）
+
+### Changed
+- RBAC 角色体系：admin / operator / viewer（首个注册用户自动 admin，其余默认 viewer）；权限映射 admin 全量、operator 含 api:read/api:write/ops:audit/ops:cmdb/ops:scripts、viewer 仅 api:read；API Key 鉴权按用户角色走同一映射（查找失败回退拒绝）；exec 终端路由移至写路由（require_role("api:write")，需 operator+）
+
+## [1.3.0] — 2026-08-06 — SuperOps P4 写操作与运营闭环
+
+### Added
+- k8s 写操作闭环：gateway 新增 `POST /api/k8s/clusters/{cluster_id}/deployments/{namespace}/{name}/scale|restart` 与 `DELETE /api/k8s/clusters/{cluster_id}/deployments/{namespace}/{name}` 路由，转发 k8s gRPC `ScaleDeployment`/`RestartDeployment`/`DeleteDeployment` RPC
+- 审计事件随写操作发布：`k8s.scale`/`k8s.restart`/`k8s.delete` 动作写入 Kafka `superops.audit`（payload 含 `level: "INFO"`）
+- 告警通知（collector `notify.rs`）：generic/钉钉/企微 webhook 通知目标（`NotifyTarget`），按目标静默窗口（`NotifySilencer`，默认 300s），collector.yaml 新增 `notify:` 配置段
+- 审计中心 API：`GET /api/audit/events?limit&offset&level`（ClickHouse `audit_log`，鉴权保护）
+- 用户管理 API：`GET /api/users`、`PATCH /api/users/{id}/status`（启用/禁用；users 表新增 role/status 列）
+- 前端运维中心：`/ops/audit`、`/ops/apikeys`、`/ops/users` 页面（运维中心菜单组）
+
 ## [1.2.2] — 2026-08-06 — 认证迁移至 e-cat 框架
 
 ### Changed

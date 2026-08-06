@@ -28,4 +28,9 @@ mq:
 consul:
   address: "http://localhost:8500"
 
+# P6-6: OTLP 端点（扁平字符串，gateway/k8s/collector 三服务导出）
 otlp: "http://localhost:4317"
+
+# P6-1: 审批工作流 — enabled 时删除 deployment 需先创建并审批通过 delete 审批单
+approval:
+  enabled: false

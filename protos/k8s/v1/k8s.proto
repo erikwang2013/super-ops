@@ -19,6 +19,10 @@ service K8sService {
   rpc ExecPod(stream ExecRequest) returns (stream ExecResponse);
 
   rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse);
+  rpc ScaleDeployment(ScaleDeploymentRequest) returns (ScaleDeploymentResponse);
+  rpc RestartDeployment(RestartDeploymentRequest) returns (RestartDeploymentResponse);
+  rpc DeleteDeployment(DeleteDeploymentRequest) returns (DeleteDeploymentResponse);
+  rpc RunJob(RunJobRequest) returns (RunJobResponse);
 }
 
 message Cluster {
@@ -160,3 +164,35 @@ message MetricPoint {
   string unit = 3;
   int64 timestamp = 4;
 }
+
+message ScaleDeploymentRequest {
+  string cluster_id = 1;
+  string namespace = 2;
+  string name = 3;
+  int32 replicas = 4;
+}
+message ScaleDeploymentResponse { int32 replicas = 1; }
+
+message RestartDeploymentRequest {
+  string cluster_id = 1;
+  string namespace = 2;
+  string name = 3;
+}
+message RestartDeploymentResponse { bool restarted = 1; }
+
+message DeleteDeploymentRequest {
+  string cluster_id = 1;
+  string namespace = 2;
+  string name = 3;
+}
+message DeleteDeploymentResponse { bool deleted = 1; }
+
+message RunJobRequest {
+  string cluster_id = 1;
+  string namespace = 2;
+  string job_name = 3;
+  string image = 4;
+  string command = 5;
+  int32 timeout_s = 6;
+}
+message RunJobResponse { bool created = 1; }

@@ -1,7 +1,7 @@
 use crate::AppState;
 use axum::{
     Json,
-    extract::State,
+    extract::{Path, State},
     http::{HeaderMap, StatusCode},
 };
 use ecat_mq::MessageQueue;
@@ -79,13 +79,14 @@ pub async fn login(
     let ttl = state.auth.config.access_token_ttl;
     let access = state
         .auth
-        .create_token(&user.id, &user.username, ttl)
+        .create_token(&user.id, &user.username, Some(&user.role), ttl)
         .map_err(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "failed to issue token"))?;
     let refresh = state
         .auth
         .create_token(
             &user.id,
             &user.username,
+            Some(&user.role),
             state.auth.config.refresh_token_ttl,
         )
         .map_err(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "failed to issue token"))?;
@@ -110,11 +111,17 @@ pub async fn register(
     Json(req): Json<RegisterRequest>,
 ) -> Result<Json<TokenResponse>, ApiError> {
     validate_credentials(&req.username, &req.email, &req.password)?;
+    // 首个注册用户自动提升为 admin（count=0 判定存在并发注册双 admin 的竞态，内部工具可接受）；其余默认 viewer
+    let role = if state.user_store.count().await.unwrap_or(1) == 0 {
+        "admin"
+    } else {
+        "viewer"
+    };
     let hash = bcrypt::hash(&req.password, bcrypt::DEFAULT_COST)
         .map_err(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "failed to hash password"))?;
     match state
         .user_store
-        .create(&req.username, &req.email, &hash)
+        .create(&req.username, &req.email, &hash, role)
         .await
     {
         Ok(user) => {
@@ -129,7 +136,7 @@ pub async fn register(
             let ttl = state.auth.config.access_token_ttl;
             let access = state
                 .auth
-                .create_token(&user.id, &user.username, ttl)
+                .create_token(&user.id, &user.username, Some(&user.role), ttl)
                 .map_err(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "failed to issue token"))?;
             Ok(Json(TokenResponse {
                 access_token: access,
@@ -167,6 +174,7 @@ async fn publish_audit(state: &AppState, event_type: &str, username: &str, detai
         let payload = serde_json::to_vec(&serde_json::json!({
             "ts": now_secs(),
             "event_type": event_type,
+            "level": "INFO",
             "username": username,
             "ip": ip,
             "detail": detail,
@@ -174,6 +182,63 @@ async fn publish_audit(state: &AppState, event_type: &str, username: &str, detai
         .unwrap_or_default();
         if let Err(e) = mq.publish("superops.audit", &payload).await {
             tracing::warn!("audit publish failed: {e}");
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetUserStatusRequest {
+    pub status: String,
+}
+
+fn validate_user_status(status: &str) -> Result<(), String> {
+    match status {
+        "enabled" | "disabled" => Ok(()),
+        _ => Err(format!(
+            "invalid status: {status} (must be 'enabled' or 'disabled')"
+        )),
+    }
+}
+
+pub async fn list_users(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let users = crate::model::user::list_users(&state.pool)
+        .await
+        .map_err(|_| err(StatusCode::BAD_GATEWAY, "failed to list users"))?;
+    Ok(Json(serde_json::json!({ "users": users })))
+}
+
+pub async fn set_user_status(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(body): Json<SetUserStatusRequest>,
+) -> Result<StatusCode, ApiError> {
+    validate_user_status(&body.status).map_err(|m| err(StatusCode::BAD_REQUEST, &m))?;
+    let updated = crate::model::user::set_user_status(&state.pool, &id, &body.status)
+        .await
+        .map_err(|_| err(StatusCode::BAD_GATEWAY, "failed to update user status"))?;
+    if updated {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(err(StatusCode::NOT_FOUND, "user not found"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_user_status_accepts_enabled_and_disabled() {
+        assert!(validate_user_status("enabled").is_ok());
+        assert!(validate_user_status("disabled").is_ok());
+    }
+
+    #[test]
+    fn validate_user_status_rejects_unknown() {
+        for bad in ["", "active", "ENABLED", "enabled "] {
+            assert!(validate_user_status(bad).is_err(), "should reject {bad:?}");
         }
     }
 }

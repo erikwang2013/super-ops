@@ -1,6 +1,6 @@
 version: v2
 plugins:
-  - plugin: prost
+  - local: protoc-gen-prost
     out: gen/rust
     opt:
       - compile_well_known_types
