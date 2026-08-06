@@ -126,12 +126,22 @@ impl RateLimiter {
 /// function inspects. `new` produces `RateLimitLayer<()>`; call
 /// [`with_key_fn`](Self::with_key_fn) with the body type of your service
 /// (e.g. `axum::body::Body`) to extract keys from the full request.
-#[derive(Clone)]
 pub struct RateLimitLayer<B = ()> {
     limiter: Arc<RateLimiter>,
     max_requests: u32,
     window: Duration,
     key_fn: KeyFn<B>,
+}
+
+impl<B> Clone for RateLimitLayer<B> {
+    fn clone(&self) -> Self {
+        Self {
+            limiter: Arc::clone(&self.limiter),
+            max_requests: self.max_requests,
+            window: self.window,
+            key_fn: Arc::clone(&self.key_fn),
+        }
+    }
 }
 
 impl RateLimitLayer<()> {
@@ -191,11 +201,23 @@ where
     }
 }
 
-#[derive(Clone)]
 pub struct RateLimitService<S, B = ()> {
     inner: S,
     limiter: Arc<RateLimiter>,
     key_fn: KeyFn<B>,
+}
+
+impl<S, B> Clone for RateLimitService<S, B>
+where
+    S: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            limiter: Arc::clone(&self.limiter),
+            key_fn: Arc::clone(&self.key_fn),
+        }
+    }
 }
 
 impl<S, B> Service<http::Request<B>> for RateLimitService<S, B>
@@ -235,6 +257,38 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[derive(Debug)]
+    struct NonCloneBody(());
+
+    #[derive(Clone)]
+    struct TestService;
+
+    impl tower::Service<http::Request<NonCloneBody>> for TestService {
+        type Response = String;
+        type Error = std::io::Error;
+        type Future = std::future::Ready<Result<Self::Response, Self::Error>>;
+
+        fn poll_ready(
+            &mut self,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _req: http::Request<NonCloneBody>) -> Self::Future {
+            std::future::ready(Ok("ok".to_string()))
+        }
+    }
+
+    #[test]
+    fn layer_and_service_clone_with_non_clone_body() {
+        let layer: RateLimitLayer<NonCloneBody> = RateLimitLayer::new(2, Duration::from_secs(60))
+            .with_key_fn(|_: &http::Request<NonCloneBody>| "key".to_string());
+        let layer2 = layer.clone();
+        let svc2 = layer2.layer(TestService);
+        let _svc3 = svc2.clone();
+    }
 
     #[tokio::test]
     async fn rate_limiter_allows_within_limit() {

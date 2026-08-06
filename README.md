@@ -49,6 +49,9 @@ cd frontend && npm install && npm run dev    # http://localhost:3000
 | MySQL | 3307 |
 | Redis | 6380 |
 | ClickHouse | 8124 (HTTP) / 9001 (native) |
+| Prometheus | 9095 |
+| Kafka | 9092 |
+| Consul | 8500 |
 
 ## 配置
 
@@ -57,8 +60,12 @@ cd frontend && npm install && npm run dev    # http://localhost:3000
 | `GATEWAY_CONFIG` | gateway 配置 YAML 路径（默认 `config/gateway.yaml`） |
 | `K8S_CONFIG` | k8s 服务配置 YAML 路径（默认 `config/k8s-service.yaml`） |
 | `SUPEROPS_JWT_SECRET` | JWT 签名密钥（生产必设，≥32 字节随机值；缺省启动有 WARN 并沿用默认值） |
+| `KAFKA_BROKERS` | Kafka broker 地址（P1 事件总线用） |
+| `CONSUL_ADDR` | Consul 地址（P2 注册/远程配置用） |
 
 数据库/Redis/ClickHouse 密码通过 `deploy/.env` 注入 compose（模板见 `deploy/.env.example`）。
+
+gateway 暴露 `/health`（liveness）、`/ready`（readiness，含 MySQL 依赖检查，失败 503）与 `/metrics`（Prometheus 文本）。
 
 ## 常用命令
 

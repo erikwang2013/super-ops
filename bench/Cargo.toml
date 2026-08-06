@@ -1,0 +1,13 @@
+[package]
+name = "bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SuperOps load benchmarks"
+
+[dependencies]
+ecat-bench = { path = "../ecat-bench" }
+tokio.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+serde_json.workspace = true
+anyhow = "1"

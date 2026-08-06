@@ -4,6 +4,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import 'xterm/css/xterm.css';
+import { useAuthStore } from '../../stores/auth';
 
 export default function TerminalPage() {
   const ref = useRef<HTMLDivElement>(null);
@@ -20,7 +21,7 @@ export default function TerminalPage() {
     };
   }, []);
 
-  const connect = (v: { cluster: string; namespace: string; pod: string }) => {
+  const connect = (v: { cluster: string; namespace: string; pod: string; container?: string }) => {
     wsRef.current?.close();
     termRef.current?.dispose();
 
@@ -31,13 +32,17 @@ export default function TerminalPage() {
     termRef.current = term;
     if (ref.current) { term.open(ref.current); fit.fit(); }
 
+    const token = useAuthStore.getState().token;
+    const container = v.container ? `&container=${encodeURIComponent(v.container)}` : '';
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${proto}//${location.host}/api/k8s/clusters/${v.cluster}/pods/${v.namespace}/${v.pod}/exec`);
+    const ws = new WebSocket(`${proto}//${location.host}/api/k8s/clusters/${v.cluster}/pods/${v.namespace}/${v.pod}/exec?token=${encodeURIComponent(token || '')}${container}`);
+    // xterm 接收二进制更快且不受 utf-8 拆分影响
+    ws.binaryType = 'arraybuffer';
     wsRef.current = ws;
 
     const onResize = () => fit.fit();
     ws.onopen = () => setConnected(true);
-    ws.onmessage = (e) => term.write(e.data);
+    ws.onmessage = (e) => term.write(new Uint8Array(e.data));
     ws.onclose = () => {
       setConnected(false);
       term.dispose();
@@ -61,6 +66,7 @@ export default function TerminalPage() {
           <Form.Item name="cluster" rules={[{ required: true }]}><Input placeholder="集群 ID" style={{ width: 200 }} /></Form.Item>
           <Form.Item name="namespace" rules={[{ required: true }]}><Input placeholder="命名空间" style={{ width: 160 }} /></Form.Item>
           <Form.Item name="pod" rules={[{ required: true }]}><Input placeholder="Pod 名称" style={{ width: 200 }} /></Form.Item>
+          <Form.Item name="container" rules={[{ required: false }]}><Input placeholder="容器（可选）" style={{ width: 160 }} /></Form.Item>
           <Form.Item><Button type="primary" htmlType="submit" disabled={connected}>连接</Button></Form.Item>
         </Form>
         {connected && <Button danger onClick={() => wsRef.current?.close()}>断开</Button>}

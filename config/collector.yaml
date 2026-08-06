@@ -1,0 +1,18 @@
+ch:
+  base_url: "http://localhost:8124"
+  database: "superops"
+mq:
+  brokers: "localhost:9092"
+  group_id: "superops-collector"
+lock:
+  url: "redis://localhost:6380"
+k8s:
+  endpoint: "http://localhost:9091"
+collector:
+  collect_interval_secs: 60
+  inspect_interval_secs: 600
+  max_not_ready: 1
+  alert_consecutive: 2
+
+consul:
+  address: "http://localhost:8500"

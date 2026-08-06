@@ -665,6 +665,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bench"
+version = "1.0.2"
+dependencies = [
+ "anyhow",
+ "ecat-bench",
+ "reqwest",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "bit-vec"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1512,6 +1523,7 @@ name = "ecat-config-remote"
 version = "1.0.2"
 dependencies = [
  "async-trait",
+ "axum 0.8.9",
  "base64 0.22.1",
  "ecat-config",
  "reqwest",
@@ -1812,7 +1824,10 @@ dependencies = [
 name = "ecat-metrics"
 version = "1.0.2"
 dependencies = [
+ "axum 0.8.9",
  "prometheus",
+ "tokio",
+ "tower 0.5.3",
 ]
 
 [[package]]
@@ -2037,6 +2052,7 @@ version = "1.0.2"
 dependencies = [
  "async-trait",
  "axum 0.8.9",
+ "ecat-metrics",
  "ecat-transport",
  "tokio",
  "tower 0.5.3",
@@ -5948,25 +5964,72 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
+name = "superops-collector"
+version = "1.0.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "ecat",
+ "ecat-data",
+ "ecat-data-clickhouse",
+ "ecat-data-redis",
+ "ecat-lock",
+ "ecat-mq",
+ "ecat-mq-kafka",
+ "ecat-registry",
+ "ecat-registry-consul",
+ "ecat-scheduler",
+ "futures",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "superops-protos",
+ "tempfile",
+ "tokio",
+ "tonic",
+ "tracing",
+]
+
+[[package]]
 name = "superops-gateway"
 version = "1.0.2"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum 0.8.9",
  "axum-extra",
  "bcrypt",
  "chrono",
  "ecat",
+ "ecat-auth",
+ "ecat-circuit-breaker",
+ "ecat-config",
+ "ecat-config-remote",
+ "ecat-data",
+ "ecat-data-clickhouse",
  "ecat-data-sqlx",
+ "ecat-health",
+ "ecat-metrics",
+ "ecat-middleware",
+ "ecat-mq",
+ "ecat-mq-kafka",
+ "ecat-openapi",
+ "ecat-registry",
+ "ecat-registry-consul",
+ "ecat-tracing-otlp",
  "ecat-transport-http",
+ "futures",
  "jsonwebtoken",
+ "prometheus",
  "prost",
  "serde",
  "serde_json",
  "serde_yaml",
+ "sha2 0.10.9",
  "sqlx",
  "superops-protos",
  "tokio",
+ "tokio-stream",
  "tonic",
  "tower 0.5.3",
  "tower-http 0.5.2",
@@ -5980,11 +6043,17 @@ name = "superops-k8s"
 version = "1.0.2"
 dependencies = [
  "anyhow",
+ "bytes",
  "dashmap",
  "ecat",
  "ecat-data-sqlx",
+ "ecat-registry",
+ "ecat-registry-consul",
+ "ecat-tracing-otlp",
  "ecat-transport-grpc",
  "futures",
+ "http-body 1.1.0",
+ "http-body-util",
  "k8s-openapi",
  "kube",
  "prost",

@@ -25,9 +25,9 @@ impl HealthRegistry {
         Self::default()
     }
 
-    pub fn with_check(self, check: impl HealthCheck + 'static) -> Self {
+    pub async fn with_check(self, check: impl HealthCheck + 'static) -> Self {
         let name = check.name().to_string();
-        self.checks.blocking_write().insert(name, Box::new(check));
+        self.checks.write().await.insert(name, Box::new(check));
         self
     }
 
@@ -150,10 +150,12 @@ mod tests {
         assert!(check.check().await.is_err());
     }
 
-    #[test]
-    fn registry_builds_with_checks() {
+    #[tokio::test]
+    async fn registry_builds_with_checks() {
         let _reg = HealthRegistry::new()
             .with_check(FnCheck::new("a", || async { Ok(()) }))
-            .with_check(FnCheck::new("b", || async { Err("err".into()) }));
+            .await
+            .with_check(FnCheck::new("b", || async { Err("err".into()) }))
+            .await;
     }
 }

@@ -1,5 +1,58 @@
 # Changelog
 
+## [1.2.0] — 2026-08-06 — SuperOps P3 集成与对外
+
+### Added
+- k8s exec 双向流（ExecPod gRPC → kube exec，stdin/stdout/stderr/terminal resize）
+- Gateway WebSocket 终端桥（/api/k8s/.../exec，浏览器 WS ↔ gRPC 双向流）
+- 前端终端页打通（token query 鉴权、binaryType、可选容器）
+- API Key 管理（表 + CRUD + X-API-Key 鉴权，吊销即时生效）
+- OAuth2 可选鉴权层（ecat-auth OAuth2Layer，默认关闭）
+- OpenAPI 文档（/api/docs，ecat-openapi）
+- bench workspace 成员（login 压测，cargo run -p bench）
+
+### Changed
+- auth_middleware 支持三种凭据：Bearer JWT → query token（WS 回退）→ X-API-Key
+- gateway 依赖：axum ws feature、futures、tokio-stream、sha2、ecat-auth、ecat-openapi
+
+## [1.1.0] — 2026-08-06 — SuperOps P2 韧性与可观测
+
+### Added
+- gateway 接入 ecat-circuit-breaker 熔断：自定义 `FiveXxToErrorLayer` 将上游 5xx 转为 Service 错误，k8s 代理路由 5 次失败后熔断 10s（失败率 50% / 窗口 30s / 半开探针 3），熔断期间返回 503
+- Consul 服务注册与发现（ecat-registry + ecat-registry-consul）：gateway/k8s/collector 启动即注册（Drop 自动注销），gateway 启动时 `discover("superops-k8s")` 解析真实 gRPC 地址，失败回退静态配置
+- 远程配置热更新（ecat-config-remote + ecat-config）：gateway 订阅 Consul KV `config/superops/gateway/*`（阻塞查询 + 首帧强制推送），`rate.limit.max`/`rate.limit.window` 变更即时生效（`DynamicRateLimitStore` 动态取值包装）
+- 限流迁移 ecat-middleware：`RateLimitLayer` + `RedisRateLimitStore`（Redis 不可用回退内存 store 并 WARN），多实例共享计数；429 文案沿用
+- OTLP 链路追踪（ecat-tracing-otlp）：gateway/k8s 导出至 Jaeger（compose 新增 jaeger 4317/16686）
+- k8s `/api/k8s/clusters/{cluster_id}/nodes` 由 stub 改为真实 gRPC 代理转发（后端不可达 502，触发熔断计数）
+
+### Removed
+- 旧内存限流 `services/gateway/src/auth/rate_limit.rs`（由 ecat-middleware 限流替代）
+
+## [1.0.5] — 2026-08-06 — SuperOps P1 数据与监控闭环
+
+### Added
+- 新增 `superops-collector` 服务（ecat-scheduler 调度）：每 60s 采集 k8s 节点/Pod/Deployment 快照，经 `ecat-data` TsdbClient 写入 ClickHouse `resource_snapshot`（summary + 逐资源点）
+- 巡检告警（每 600s）：node 非 Ready → CRIT、Pod 非 Running/Succeeded → WARN、Deployment ready < replicas → WARN，写入 `alert_event`；`ecat-lock` RedisLock 互斥保证多实例下仅单实例巡检
+- Kafka 审计事件闭环：gateway login/register 发布 `superops.audit`（ecat-mq-kafka），collector 消费写入 `audit_log`
+- gateway 新增 `GET /api/v1/metrics/query`：按 series 分组、`argMax(field, timestamp)` 取最新值，返回 JSON 序列
+
+### Updated
+- gateway/collector 接线 e-cat 框架 API：`TsdbClient::write/query` 全限定调用、`MessageStream::poll_recv` 经 `futures::future::poll_fn` 消费、`DataPoint` 消费式 builder、生命周期钩子闭包模式
+
+## [1.0.4] — 2026-08-06 — SuperOps P0 可观测地基
+
+### Added
+- gateway 接入 `ecat-health`：`/health`（liveness）与 `/ready`（readiness，含 MySQL 依赖检查，失败 503）
+- gateway 接入 `ecat-metrics`：`/metrics` Prometheus 文本导出 + `superops_http_requests_total` 请求计数
+- docker-compose 补齐 Prometheus（9095）、Kafka KRaft 单节点（9092）、Consul dev 模式（8500）
+- `deploy/prometheus.yml` scrape 配置（gateway:8080/metrics）；`.env.example` 追加 KAFKA_BROKERS/CONSUL_ADDR/OTLP_ENDPOINT/CH_URL/PROMETHEUS_PORT
+
+### Fixed
+- `ecat-health::HealthRegistry::with_check` 由 `blocking_write` 改为异步写锁（`pub async fn`），修复在 tokio runtime 内注册检查必然 panic 的问题
+
+### Updated
+- 同步 e-cat 上游最新代码（HEAD 2cc0fb0）：`ecat-metrics` 新增 `metrics_router()`、`ecat-transport-http` 自动挂载 `/metrics`（框架保留路径）、`ecat-config-remote` 新增 `watch()`、`ecat-data-clickhouse` 新增 `TsdbClient` 实现、`ecat-openapi` 支持 PUT/DELETE/PATCH/HEAD/OPTIONS；gateway 移除手动 `/metrics` 路由改用框架自动挂载
+
 ## [1.0.3] — 2026-08-06 — SuperOps services
 
 ### Security

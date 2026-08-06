@@ -9,6 +9,12 @@ gateway:
 k8s-service:
 	cd services/k8s && cargo build
 
+collector:
+	cd services/collector && cargo run
+
+collector-stop:
+	pkill -f "superops-collector" || true
+
 frontend:
 	cd frontend && npm run dev
 
@@ -22,12 +28,15 @@ dev-all:
 	sleep 2
 	cd services/k8s && K8S_CONFIG=../../config/k8s-service.yaml cargo run &
 	sleep 2
+	cd services/collector && COLLECTOR_CONFIG=../../config/collector.yaml cargo run &
+	sleep 2
 	cd frontend && npm run dev
 
 stop-all:
 	cd deploy && docker compose down
 	pkill -f "superops-gateway" || true
 	pkill -f "superops-k8s" || true
+	pkill -f "superops-collector" || true
 
 clean:
 	cargo clean

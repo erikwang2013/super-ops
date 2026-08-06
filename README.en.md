@@ -49,6 +49,9 @@ Test account (local dev database): `erik / Test1234!`
 | MySQL | 3307 |
 | Redis | 6380 |
 | ClickHouse | 8124 (HTTP) / 9001 (native) |
+| Prometheus | 9095 |
+| Kafka | 9092 |
+| Consul | 8500 |
 
 ## Configuration
 
@@ -57,8 +60,12 @@ Test account (local dev database): `erik / Test1234!`
 | `GATEWAY_CONFIG` | Gateway config YAML path (default `config/gateway.yaml`) |
 | `K8S_CONFIG` | K8s service config YAML path (default `config/k8s-service.yaml`) |
 | `SUPEROPS_JWT_SECRET` | JWT signing secret (required in production, ≥32 random bytes; startup warns when the default is used) |
+| `KAFKA_BROKERS` | Kafka broker address (for the P1 event bus) |
+| `CONSUL_ADDR` | Consul address (for P2 registry / remote config) |
 
 Database/Redis/ClickHouse passwords are injected into compose via `deploy/.env` (template: `deploy/.env.example`).
+
+The gateway exposes `/health` (liveness), `/ready` (readiness, checks MySQL, 503 on failure) and `/metrics` (Prometheus text format).
 
 ## Common Commands
 

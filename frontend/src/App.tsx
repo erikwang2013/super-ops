@@ -32,9 +32,9 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/k8s/clusters" element={<ClustersPage />} />
           <Route path="/k8s/clusters/:id" element={<ClusterDetail />} />
-          <Route path="/k8s/pods" element={<PodsPage />} />
-          <Route path="/k8s/deployments" element={<DeploymentsPage />} />
-          <Route path="/k8s/nodes" element={<NodesPage />} />
+          <Route path="/k8s/pods" element={<PodsPage clusterId="default" />} />
+          <Route path="/k8s/deployments" element={<DeploymentsPage clusterId="default" />} />
+          <Route path="/k8s/nodes" element={<NodesPage clusterId="default" />} />
           <Route path="/k8s/terminal" element={<TerminalPage />} />
         </Routes>
       </PageContainer>

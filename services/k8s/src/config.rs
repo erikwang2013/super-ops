@@ -1,23 +1,32 @@
 use anyhow::Result;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub server: ServerConfig,
     // Phase 2 (persistence) — deserialized from YAML, not yet read
     #[allow(dead_code)]
     pub database: DatabaseConfig,
+    #[serde(default)]
+    pub consul: Option<ConsulConfig>,
+    #[serde(default)]
+    pub otlp: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ServerConfig {
     pub grpc_port: u16,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
     #[allow(dead_code)]
     pub url: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ConsulConfig {
+    pub address: String,
 }
 
 impl Config {

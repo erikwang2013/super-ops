@@ -3,3 +3,8 @@ server:
 
 database:
   url: "mysql://superops:superops@localhost:3307/superops"
+
+consul:
+  address: "http://localhost:8500"
+
+otlp: "http://localhost:4317"

@@ -1,0 +1,27 @@
+use crate::ch::{build_snapshot_points, clickhouse_from, now_secs, write_snapshot};
+use crate::config::Config;
+use superops_protos::k8s::v1::k8s_service_client::K8sServiceClient;
+use superops_protos::k8s::v1::{ListDeploymentsRequest, ListNodesRequest, ListPodsRequest};
+
+pub async fn collect_once(cfg: &Config) -> anyhow::Result<()> {
+    let mut client = K8sServiceClient::connect(cfg.k8s.endpoint.clone()).await?;
+    let nodes = client
+        .list_nodes(ListNodesRequest::default())
+        .await?
+        .into_inner()
+        .nodes;
+    let pods = client
+        .list_pods(ListPodsRequest::default())
+        .await?
+        .into_inner()
+        .pods;
+    let deps = client
+        .list_deployments(ListDeploymentsRequest::default())
+        .await?
+        .into_inner()
+        .deployments;
+    let ch = clickhouse_from(cfg)?;
+    let points = build_snapshot_points(&nodes, &pods, &deps, now_secs());
+    write_snapshot(ch.as_ref(), &points).await?;
+    Ok(())
+}

@@ -1,5 +1,6 @@
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 use kube::ResourceExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -293,9 +294,134 @@ impl K8sService for K8sServiceImpl {
 
     async fn exec_pod(
         &self,
-        _request: Request<tonic::Streaming<superops_protos::k8s::v1::ExecRequest>>,
+        request: Request<tonic::Streaming<superops_protos::k8s::v1::ExecRequest>>,
     ) -> GrpcResult<Self::ExecPodStream> {
-        Err(Status::unimplemented("exec pod not yet implemented"))
+        let mut in_stream = request.into_inner();
+        let first = in_stream
+            .message()
+            .await
+            .map_err(|e| Status::internal(format!("read exec request: {e}")))?
+            .ok_or_else(|| {
+                Status::invalid_argument("exec stream must start with a connect message")
+            })?;
+        let client = self
+            .manager
+            .get(&first.cluster_id)
+            .map_err(|e| Status::not_found(e.to_string()))?;
+        let container = if first.container.is_empty() {
+            None
+        } else {
+            Some(first.container.clone())
+        };
+
+        let mut attached = resource::exec::exec_pod(
+            &client,
+            first.namespace.clone(),
+            first.pod_name.clone(),
+            container,
+            &first.command,
+        )
+        .await
+        .map_err(|e| Status::internal(format!("exec failed: {e}")))?;
+        let stdin = attached.stdin();
+        let stdout = attached.stdout();
+        let stderr = attached.stderr();
+        let resize = attached.terminal_size();
+
+        let (tx, rx) = mpsc::channel::<Result<superops_protos::k8s::v1::ExecResponse, Status>>(128);
+
+        // outbound stdout → client
+        let out_tx = tx.clone();
+        tokio::spawn(async move {
+            let mut reader = match stdout {
+                Some(r) => r,
+                None => return,
+            };
+            let mut buf = vec![0u8; 8192];
+            loop {
+                match reader.read(&mut buf).await {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        if out_tx
+                            .send(Ok(superops_protos::k8s::v1::ExecResponse {
+                                stdout: buf[..n].to_vec(),
+                                stderr: Vec::new(),
+                            }))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
+        // outbound stderr → client
+        let out_tx2 = tx.clone();
+        tokio::spawn(async move {
+            let mut reader = match stderr {
+                Some(r) => r,
+                None => return,
+            };
+            let mut buf = vec![0u8; 8192];
+            loop {
+                match reader.read(&mut buf).await {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        if out_tx2
+                            .send(Ok(superops_protos::k8s::v1::ExecResponse {
+                                stdout: Vec::new(),
+                                stderr: buf[..n].to_vec(),
+                            }))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
+        // inbound: client → stdin / resize
+        tokio::spawn(async move {
+            let mut writer = stdin;
+            let mut resize = resize;
+            if !first.stdin.is_empty() {
+                if let Some(w) = writer.as_mut() {
+                    if w.write_all(&first.stdin).await.is_err() {
+                        return;
+                    }
+                }
+            }
+            while let Some(msg) = in_stream.next().await {
+                let Ok(msg) = msg else { break };
+                if let Some(ws) = resize.as_mut() {
+                    if let Some(ts) = msg.terminal_size {
+                        if ws
+                            .send(kube::api::TerminalSize {
+                                height: ts.height as u16,
+                                width: ts.width as u16,
+                            })
+                            .await
+                            .is_err()
+                        {
+                            return;
+                        }
+                    }
+                }
+                if !msg.stdin.is_empty() {
+                    if let Some(w) = writer.as_mut() {
+                        if w.write_all(&msg.stdin).await.is_err() {
+                            return;
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
     async fn get_metrics(
@@ -305,5 +431,62 @@ impl K8sService for K8sServiceImpl {
         Ok(Response::new(GetMetricsResponse {
             metrics: Vec::new(),
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http_body_util::StreamBody;
+    use prost::Message as _;
+    use tonic::codec::{Codec as _, ProstCodec};
+
+    type ExecRequest = superops_protos::k8s::v1::ExecRequest;
+    type ExecResponse = superops_protos::k8s::v1::ExecResponse;
+
+    fn grpc_frame(msg: &ExecRequest) -> bytes::Bytes {
+        let payload = msg.encode_to_vec();
+        let mut frame = Vec::with_capacity(5 + payload.len());
+        frame.push(0u8); // no compression
+        frame.extend_from_slice(&(payload.len() as u32).to_be_bytes());
+        frame.extend_from_slice(&payload);
+        bytes::Bytes::from(frame)
+    }
+
+    fn exec_stream(msgs: Vec<ExecRequest>) -> tonic::Streaming<ExecRequest> {
+        let frames = msgs
+            .into_iter()
+            .map(|m| Ok::<_, std::io::Error>(http_body::Frame::data(grpc_frame(&m))));
+        // ProstCodec<T, U>: T = Encode, U = Decode → 请求方向 decoder = ProstCodec<_, ExecRequest>
+        let mut codec = ProstCodec::<ExecResponse, ExecRequest>::default();
+        tonic::Streaming::new_request(
+            codec.decoder(),
+            StreamBody::new(tokio_stream::iter(frames)),
+            None,
+            None,
+        )
+    }
+
+    #[tokio::test]
+    async fn exec_pod_rejects_empty_stream() {
+        let svc = K8sServiceImpl {
+            manager: ClusterManager::new(),
+        };
+        let req = Request::new(exec_stream(vec![]));
+        let err = svc.exec_pod(req).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+    }
+
+    #[tokio::test]
+    async fn exec_pod_unknown_cluster_is_not_found() {
+        let svc = K8sServiceImpl {
+            manager: ClusterManager::new(),
+        };
+        let req = Request::new(exec_stream(vec![ExecRequest {
+            cluster_id: "nope".into(),
+            ..Default::default()
+        }]));
+        let err = svc.exec_pod(req).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::NotFound);
     }
 }

@@ -59,6 +59,8 @@ members = [
     "superops-protos",
     "services/k8s",
     "services/gateway",
+    "services/collector",
+    "bench",
 ]
 exclude = ["frontend/src-tauri"]
 resolver = "2"

@@ -1,0 +1,31 @@
+[package]
+name = "superops-collector"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SuperOps collector - k8s snapshot, alert inspection, audit ingestion"
+
+[dependencies]
+superops-protos = { path = "../../superops-protos" }
+ecat = { path = "../../ecat" }
+ecat-data = { path = "../../ecat-data" }
+ecat-data-clickhouse = { path = "../../ecat-data-clickhouse" }
+ecat-data-redis = { path = "../../ecat-data-redis" }
+ecat-lock = { path = "../../ecat-lock" }
+ecat-mq = { path = "../../ecat-mq" }
+ecat-mq-kafka = { path = "../../ecat-mq-kafka" }
+ecat-registry = { path = "../../ecat-registry" }
+ecat-registry-consul = { path = "../../ecat-registry-consul" }
+ecat-scheduler = { path = "../../ecat-scheduler" }
+tonic.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+async-trait.workspace = true
+anyhow = "1"
+serde_yaml = "0.9"
+futures = "0.3"
+
+[dev-dependencies]
+tempfile = "3"
