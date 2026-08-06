@@ -87,6 +87,38 @@
 
 workspace 版本 **1.0.2**，gateway 与 k8s 服务均编译自 workspace（`version.workspace = true`），运行日志一致显示 1.0.2 —— 无版本漂移。
 
-## 6. 结论
+## 6. e-cat 框架化审计（1.2.2 追加）
 
-Phase 1 MVP 目标全部达成（44 个计划步骤已实现）。两轮审查共发现并修复：**1 项 CRITICAL 认证绕过** + 5 项安全问题 + 6 项代码质量/前端问题 + 4 项生态缺口，全部重新验证通过（e2e 21/21、安全专项 15/15、两 crate 零警告、fmt/CI/compose/前端构建全绿）。剩余项目均为文档明确的 Phase 2 范围（gRPC proxy、终端 WebSocket 桥接）。
+全量核查三个服务（gateway / k8s / collector）是否以 e-cat 框架为基础实现。
+
+### 6.1 已基于框架（32 处 ecat 依赖，无需迁移）
+
+| 能力 | 框架组件 |
+|---|---|
+| 应用生命周期 / 传输 | `ecat::App::builder()` + ecat-transport-http / ecat-transport-grpc |
+| 认证 OAuth2 | ecat-auth `OAuth2Layer` |
+| 限流 | ecat-middleware `RateLimitLayer` + `RedisRateLimitStore` |
+| 熔断 | ecat-circuit-breaker `CircuitBreakerLayer` |
+| 配置热更新 | ecat-config-remote + ecat-config |
+| 注册发现 | ecat-registry + ecat-registry-consul |
+| 消息 | ecat-mq + ecat-mq-kafka |
+| 存储 | ecat-data + ecat-data-sqlx / -clickhouse / -redis |
+| 分布式锁 | ecat-lock `RedisLock` |
+| 调度 | ecat-scheduler |
+| 健康 / 指标 | ecat-health / ecat-metrics |
+| API 文档 | ecat-openapi |
+| 追踪 | ecat-tracing-otlp（OTLP → Jaeger） |
+
+### 6.2 本轮迁移（1.2.2）
+
+- **JWT 签发/校验 → ecat-auth**：框架新增 `sign_token` / `verify_token`（HS256、基于 `AuthClaims`、密钥 ≥32 字节强制校验），`JwtAuthService` 内部复用；gateway 删除自研 `Claims` 结构与 jsonwebtoken/chrono 直接依赖，`create_token`/`verify_token` 委托框架，凭证链复用框架 helpers（`extract_bearer` / `extract_query_param`），X-API-Key 与 OAuth2 统一注入框架 `AuthClaims`（此前双 claims 类型并存）
+- **迁移引入问题已修复**：默认开发密钥 24 字节触发框架 `WeakKey` 拒绝签发（登录 500）→ 开发密钥提升至 ≥32 字节并同步 config.rs 哨兵检查
+
+### 6.3 验证
+
+- workspace 296 项测试全过（ecat-auth +6 项：签发/校验 roundtrip、extra claims、过期、篡改、弱密钥、错密钥）
+- 运行时回归：login → JWT 200、伪造/缺失 token 401、API Key 创建/使用/删除/吊销 200/204/401、query token 回退 200
+
+## 7. 结论
+
+Phase 1 MVP 目标全部达成（44 个计划步骤已实现）。两轮审查共发现并修复：**1 项 CRITICAL 认证绕过** + 5 项安全问题 + 6 项代码质量/前端问题 + 4 项生态缺口，全部重新验证通过（e2e 21/21、安全专项 15/15、两 crate 零警告、fmt/CI/compose/前端构建全绿）。1.2.2 完成认证功能整体迁移至 ecat-auth，框架化审计确认三个服务的全部能力均已基于 e-cat 组件。剩余项目均为文档明确的 Phase 2 范围（gRPC proxy、终端 WebSocket 桥接）。

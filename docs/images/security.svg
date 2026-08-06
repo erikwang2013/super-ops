@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 700" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1100" height="700" fill="#ffffff"/>
+  <text x="20" y="30" font-size="18" font-weight="bold" fill="#0f172a">SuperOps 安全防护</text>
+  <text x="20" y="50" font-size="12" fill="#64748b">六道防线 + 熔断兜底；Phase 1 安全审查发现的问题已全部修复并重新验证</text>
+
+  <!-- 第一行 -->
+  <rect x="60" y="80" width="300" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="80" y="106" font-weight="bold" fill="#1e40af">① 认证（ecat-auth 三通道）</text>
+  <text x="80" y="128" fill="#334155">· JWT HS256 验签 · 密钥 ≥32 字节</text>
+  <text x="80" y="148" fill="#334155">· 过期拒绝 · 篡改拒绝</text>
+  <text x="80" y="168" fill="#334155">· OAuth2 introspection（可选）</text>
+  <text x="80" y="188" fill="#334155">· X-API-Key 哈希查表 · 吊销即时</text>
+
+  <rect x="400" y="80" width="300" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="420" y="106" font-weight="bold" fill="#1e40af">② 客户端防护</text>
+  <text x="420" y="128" fill="#334155">· Tauri CSP：default-src 'self'</text>
+  <text x="420" y="148" fill="#334155">· token 仅存内存（不落 localStorage）</text>
+  <text x="420" y="168" fill="#334155">· 仅连接 gateway:8080</text>
+  <text x="420" y="188" fill="#334155">· dev 放行 vite :3000 与 HMR ws</text>
+
+  <rect x="740" y="80" width="300" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="760" y="106" font-weight="bold" fill="#1e40af">③ 限流防爆破</text>
+  <text x="760" y="128" fill="#334155">· 登录 10 次 / 60s / IP</text>
+  <text x="760" y="148" fill="#334155">· Redis 共享计数（多实例一致）</text>
+  <text x="760" y="168" fill="#334155">· Consul KV 阈值热更新即时生效</text>
+  <text x="760" y="188" fill="#334155">· 超限返回 429</text>
+
+  <!-- 第二行 -->
+  <rect x="60" y="260" width="300" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="80" y="286" font-weight="bold" fill="#1e40af">④ 输入校验（注册 / 登录）</text>
+  <text x="80" y="308" fill="#334155">· username 3-32：字母 / 数字 / _ / -</text>
+  <text x="80" y="328" fill="#334155">· email 5-254 且含 @</text>
+  <text x="80" y="348" fill="#334155">· password 8-72</text>
+  <text x="80" y="368" fill="#334155">· 非法输入 → 400 + 明确错误</text>
+
+  <rect x="400" y="260" width="300" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="420" y="286" font-weight="bold" fill="#1e40af">⑤ 数据安全</text>
+  <text x="420" y="308" fill="#334155">· 密码 bcrypt 散列存储</text>
+  <text x="420" y="328" fill="#334155">· SQL 全参数化绑定（防注入）</text>
+  <text x="420" y="348" fill="#334155">· JWT Claims 含 exp / iat</text>
+  <text x="420" y="368" fill="#334155">· 失败文案统一 · 不枚举用户</text>
+
+  <rect x="740" y="260" width="300" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="760" y="286" font-weight="bold" fill="#1e40af">⑥ CORS 白名单</text>
+  <text x="760" y="308" fill="#334155">· localhost:3000 / tauri://localhost</text>
+  <text x="760" y="328" fill="#334155">· 方法 GET / POST / DELETE</text>
+  <text x="760" y="348" fill="#334155">· 头 Authorization / Content-Type</text>
+  <text x="760" y="368" fill="#334155">· 恶意 origin 无 ACAO 头</text>
+
+  <!-- 熔断兜底 -->
+  <rect x="60" y="450" width="980" height="100" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="60" y="450" width="980" height="28" rx="8" fill="#0f172a"/>
+  <rect x="60" y="464" width="980" height="14" fill="#0f172a"/>
+  <text x="80" y="469" font-weight="bold" fill="#ffffff">熔断兜底（ecat-circuit-breaker）</text>
+  <text x="80" y="500" fill="#334155">· 上游 5xx 连续失败 → 熔断 10s（50% / 30s 窗口）→ 熔断期间直接返回 503</text>
+  <text x="80" y="522" fill="#334155">· 半开探针自动探测 · 上游恢复后放行</text>
+
+  <!-- 验证 -->
+  <rect x="60" y="580" width="980" height="90" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+  <text x="80" y="604" font-weight="bold" fill="#1e40af">已修复并重新验证（Phase 1 安全审查）</text>
+  <text x="80" y="628" fill="#334155">· 无 token → 401 · 伪造 / 篡改 token → 401 · 合法 token → 200（clusters / pods / exec）</text>
+  <text x="80" y="650" fill="#334155">· 爆破 401×9 → 429×3（窗口总量精确 10 次）· API Key 创建 / 使用 / 吊销 200 / 204 / 401</text>
+</svg>

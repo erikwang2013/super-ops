@@ -79,7 +79,7 @@ impl Config {
                 config.auth.jwt_secret = secret;
             }
         }
-        if config.auth.jwt_secret == "change-me-in-production" {
+        if config.auth.jwt_secret == "change-me-in-production-0123456789abcdef" {
             tracing::warn!(
                 "using default JWT secret — set SUPEROPS_JWT_SECRET (>=32 chars) in production"
             );

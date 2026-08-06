@@ -1,13 +1,15 @@
+-- 索引内嵌在 CREATE TABLE 中而非独立 CREATE INDEX：
+-- MySQL 8 不支持 CREATE INDEX IF NOT EXISTS，独立语句重跑会中断
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(36) PRIMARY KEY,
     username VARCHAR(64) NOT NULL UNIQUE,
     email VARCHAR(128) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_users_username (username),
+    KEY idx_users_email (email)
 );
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_email ON users(email);
 
 CREATE TABLE IF NOT EXISTS api_keys (
     id VARCHAR(36) PRIMARY KEY,
@@ -16,6 +18,6 @@ CREATE TABLE IF NOT EXISTS api_keys (
     key_hash CHAR(64) NOT NULL UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_api_keys_user (user_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
-CREATE INDEX idx_api_keys_user ON api_keys(user_id);

@@ -130,13 +130,8 @@ async fn exec_socket(
             Err(e) => return send_error(socket, &format!("k8s backend unreachable: {e}")).await,
         };
     let (req_tx, req_rx) = mpsc::channel::<ExecRequest>(64);
-    let resp = match client.exec_pod(ReceiverStream::new(req_rx)).await {
-        Ok(r) => r,
-        Err(e) => return send_error(socket, &format!("exec rpc failed: {e}")).await,
-    };
-    let mut exec_stream = resp.into_inner();
-    let (mut ws_tx, mut ws_rx) = socket.split();
-
+    // 先入队初始化消息再发起双向流：服务端 handler 会先读第一个消息才返回响应头，
+    // 若在 exec_pod().await 之后才 send 会造成客户端等响应头、服务端等首消息的死锁
     let _ = req_tx
         .send(ExecRequest {
             cluster_id: cid,
@@ -148,6 +143,12 @@ async fn exec_socket(
             terminal_size: None,
         })
         .await;
+    let resp = match client.exec_pod(ReceiverStream::new(req_rx)).await {
+        Ok(r) => r,
+        Err(e) => return send_error(socket, &format!("exec rpc failed: {e}")).await,
+    };
+    let mut exec_stream = resp.into_inner();
+    let (mut ws_tx, mut ws_rx) = socket.split();
 
     // ws → gRPC stdin
     let inbound = tokio::spawn(async move {

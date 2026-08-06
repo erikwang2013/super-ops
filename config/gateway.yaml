@@ -3,7 +3,7 @@ server:
   grpc_port: 9090
 
 auth:
-  jwt_secret: "change-me-in-production"
+  jwt_secret: "change-me-in-production-0123456789abcdef"
   access_token_ttl: 1800
   refresh_token_ttl: 604800
 

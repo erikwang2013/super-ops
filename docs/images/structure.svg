@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 720" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1100" height="720" fill="#ffffff"/>
+  <text x="20" y="30" font-size="18" font-weight="bold" fill="#0f172a">SuperOps 功能结构</text>
+  <text x="20" y="50" font-size="12" fill="#64748b">四个模块：gateway（接入）/ k8s（集群）/ collector（采集）/ frontend（展示），全部基于 e-cat 框架</text>
+
+  <!-- Gateway -->
+  <rect x="60" y="80" width="250" height="420" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="60" y="80" width="250" height="28" rx="8" fill="#0f172a"/>
+  <rect x="60" y="94" width="250" height="14" fill="#0f172a"/>
+  <text x="185" y="99" text-anchor="middle" font-weight="bold" fill="#ffffff">Gateway :8080 / :9090</text>
+  <text x="185" y="122" text-anchor="middle" fill="#94a3b8" font-size="11.5">services/gateway</text>
+  <text x="80" y="148" fill="#334155">auth/middleware.rs</text>
+  <text x="80" y="164" fill="#94a3b8" font-size="11.5">JWT / OAuth2 / X-API-Key 链</text>
+  <text x="80" y="188" fill="#334155">auth/handler.rs</text>
+  <text x="80" y="204" fill="#94a3b8" font-size="11.5">登录 / 注册</text>
+  <text x="80" y="228" fill="#334155">auth/apikey.rs</text>
+  <text x="80" y="244" fill="#94a3b8" font-size="11.5">API Key 增删 / 吊销</text>
+  <text x="80" y="268" fill="#334155">middleware.rs</text>
+  <text x="80" y="284" fill="#94a3b8" font-size="11.5">限流 + 熔断挂载</text>
+  <text x="80" y="308" fill="#334155">proxy.rs</text>
+  <text x="80" y="324" fill="#94a3b8" font-size="11.5">gRPC 代理 → :9091</text>
+  <text x="80" y="348" fill="#334155">metrics.rs</text>
+  <text x="80" y="364" fill="#94a3b8" font-size="11.5">/metrics 指标</text>
+  <text x="80" y="388" fill="#334155">openapi.rs</text>
+  <text x="80" y="404" fill="#94a3b8" font-size="11.5">/api/docs 文档</text>
+  <text x="80" y="428" fill="#334155">config.rs</text>
+  <text x="80" y="444" fill="#94a3b8" font-size="11.5">配置 + 哨兵检查</text>
+  <text x="80" y="468" fill="#334155">Consul 注册 / KV 热更新</text>
+  <text x="80" y="484" fill="#94a3b8" font-size="11.5">ecat-config-remote</text>
+
+  <!-- K8s -->
+  <rect x="340" y="80" width="250" height="420" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="340" y="80" width="250" height="28" rx="8" fill="#0f172a"/>
+  <rect x="340" y="94" width="250" height="14" fill="#0f172a"/>
+  <text x="465" y="99" text-anchor="middle" font-weight="bold" fill="#ffffff">K8s Service :9091</text>
+  <text x="465" y="122" text-anchor="middle" fill="#94a3b8" font-size="11.5">services/k8s</text>
+  <text x="360" y="148" fill="#334155">resource/cluster.rs</text>
+  <text x="360" y="164" fill="#94a3b8" font-size="11.5">kubeconfig 增删查</text>
+  <text x="360" y="188" fill="#334155">resource/pod.rs</text>
+  <text x="360" y="204" fill="#94a3b8" font-size="11.5">Pod 查询 / 日志流</text>
+  <text x="360" y="228" fill="#334155">resource/deployment.rs</text>
+  <text x="360" y="244" fill="#94a3b8" font-size="11.5">Deployment 副本</text>
+  <text x="360" y="268" fill="#334155">resource/node.rs</text>
+  <text x="360" y="284" fill="#94a3b8" font-size="11.5">Node 查询</text>
+  <text x="360" y="308" fill="#334155">exec.rs</text>
+  <text x="360" y="324" fill="#94a3b8" font-size="11.5">终端双向流</text>
+  <text x="360" y="348" fill="#334155">watch.rs</text>
+  <text x="360" y="364" fill="#94a3b8" font-size="11.5">ADDED/MODIFIED/DELETED</text>
+  <text x="360" y="388" fill="#334155">gRPC server</text>
+  <text x="360" y="404" fill="#94a3b8" font-size="11.5">ecat-transport-grpc</text>
+  <text x="360" y="428" fill="#334155">Consul 注册</text>
+  <text x="360" y="444" fill="#94a3b8" font-size="11.5">ecat-registry-consul</text>
+  <text x="360" y="468" fill="#334155">OTLP 追踪导出</text>
+  <text x="360" y="484" fill="#94a3b8" font-size="11.5">ecat-tracing-otlp</text>
+
+  <!-- Collector -->
+  <rect x="620" y="80" width="250" height="420" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="620" y="80" width="250" height="28" rx="8" fill="#0f172a"/>
+  <rect x="620" y="94" width="250" height="14" fill="#0f172a"/>
+  <text x="745" y="99" text-anchor="middle" font-weight="bold" fill="#ffffff">Collector</text>
+  <text x="745" y="122" text-anchor="middle" fill="#94a3b8" font-size="11.5">services/collector</text>
+  <text x="640" y="148" fill="#334155">collect.rs</text>
+  <text x="640" y="164" fill="#94a3b8" font-size="11.5">周期采集 → ClickHouse</text>
+  <text x="640" y="188" fill="#334155">inspect.rs</text>
+  <text x="640" y="204" fill="#94a3b8" font-size="11.5">巡检 + 告警规则</text>
+  <text x="640" y="228" fill="#334155">alert.rs</text>
+  <text x="640" y="244" fill="#94a3b8" font-size="11.5">alert_event 写入</text>
+  <text x="640" y="268" fill="#334155">events.rs</text>
+  <text x="640" y="284" fill="#94a3b8" font-size="11.5">Kafka 审计消费</text>
+  <text x="640" y="308" fill="#334155">lock.rs</text>
+  <text x="640" y="324" fill="#94a3b8" font-size="11.5">Redis 互斥巡检</text>
+  <text x="640" y="348" fill="#334155">调度器</text>
+  <text x="640" y="364" fill="#94a3b8" font-size="11.5">ecat-scheduler</text>
+  <text x="640" y="388" fill="#334155">存储接入</text>
+  <text x="640" y="404" fill="#94a3b8" font-size="11.5">ecat-data-clickhouse</text>
+  <text x="640" y="428" fill="#334155">消息接入</text>
+  <text x="640" y="444" fill="#94a3b8" font-size="11.5">ecat-mq-kafka</text>
+  <text x="640" y="468" fill="#334155">健康 / 指标</text>
+  <text x="640" y="484" fill="#94a3b8" font-size="11.5">ecat-health / ecat-metrics</text>
+
+  <!-- Frontend -->
+  <rect x="900" y="80" width="180" height="420" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+  <rect x="900" y="80" width="180" height="28" rx="8" fill="#1e40af"/>
+  <rect x="900" y="94" width="180" height="14" fill="#1e40af"/>
+  <text x="990" y="99" text-anchor="middle" font-weight="bold" fill="#ffffff">Frontend :3000</text>
+  <text x="990" y="122" text-anchor="middle" fill="#94a3b8" font-size="11.5">frontend/src</text>
+  <text x="918" y="148" fill="#334155">pages/k8s/</text>
+  <text x="918" y="164" fill="#94a3b8" font-size="11.5">集群 / Pod / 日志</text>
+  <text x="918" y="182" fill="#94a3b8" font-size="11.5">终端 / 指标</text>
+  <text x="918" y="208" fill="#334155">services/api.ts</text>
+  <text x="918" y="224" fill="#94a3b8" font-size="11.5">axios + token 注入</text>
+  <text x="918" y="250" fill="#334155">services/k8s.ts</text>
+  <text x="918" y="266" fill="#94a3b8" font-size="11.5">接口类型定义</text>
+  <text x="918" y="292" fill="#334155">store/auth.ts</text>
+  <text x="918" y="308" fill="#94a3b8" font-size="11.5">token 仅存内存</text>
+  <text x="918" y="334" fill="#334155">Tauri 2 打包</text>
+  <text x="918" y="350" fill="#94a3b8" font-size="11.5">CSP 白名单</text>
+  <text x="918" y="376" fill="#334155">vite 构建</text>
+  <text x="918" y="392" fill="#94a3b8" font-size="11.5">tsc + vite build</text>
+
+  <!-- 框架 -->
+  <rect x="60" y="530" width="1020" height="80" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="60" y="530" width="1020" height="28" rx="8" fill="#0f172a"/>
+  <rect x="60" y="544" width="1020" height="14" fill="#0f172a"/>
+  <text x="80" y="549" font-weight="bold" fill="#ffffff">e-cat 框架组件（32 处 ecat 依赖）</text>
+  <text x="80" y="578" fill="#334155">ecat-auth · ecat-middleware · ecat-circuit-breaker · ecat-config-remote · ecat-config</text>
+  <text x="80" y="598" fill="#334155">ecat-registry(-consul) · ecat-mq(-kafka) · ecat-scheduler · ecat-lock · ecat-data(-sqlx/-clickhouse/-redis) · ecat-tracing-otlp · ecat-openapi</text>
+
+  <!-- 验证 -->
+  <rect x="60" y="630" width="1020" height="54" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+  <text x="80" y="652" font-weight="bold" fill="#1e40af">验证状态</text>
+  <text x="80" y="672" fill="#334155">workspace 296 项测试通过 · cargo fmt / check 零警告 · e2e 21/21 · 安全专项 15/15 · 前端 tsc + build 通过</text>
+</svg>

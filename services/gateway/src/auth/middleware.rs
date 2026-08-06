@@ -6,19 +6,11 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
-use serde::{Deserialize, Serialize};
+use ecat_auth::{AuthClaims, extract_bearer, extract_query_param};
+use serde_json::json;
 
 use crate::AppState;
 use crate::config::AuthConfig;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Claims {
-    pub sub: String,
-    pub username: String,
-    pub exp: usize,
-    pub iat: usize,
-}
 
 pub struct AuthState {
     pub config: AuthConfig,
@@ -29,33 +21,31 @@ impl AuthState {
         Self { config }
     }
 
+    /// 签发 JWT：委托框架 ecat-auth 的 HS256 签发（sub + username 附加 claim）。
     pub fn create_token(
         &self,
         user_id: &str,
         username: &str,
         ttl: u64,
-    ) -> Result<String, jsonwebtoken::errors::Error> {
-        let now = chrono::Utc::now().timestamp() as usize;
-        let claims = Claims {
+    ) -> Result<String, ecat_auth::JwtAuthError> {
+        let claims = AuthClaims {
             sub: user_id.to_string(),
-            username: username.to_string(),
-            exp: now + ttl as usize,
-            iat: now,
+            exp: None,
+            iat: None,
+            role: None,
+            extra: [(
+                "username".to_string(),
+                serde_json::Value::String(username.to_string()),
+            )]
+            .into_iter()
+            .collect(),
         };
-        encode(
-            &Header::default(),
-            &claims,
-            &EncodingKey::from_secret(self.config.jwt_secret.as_bytes()),
-        )
+        ecat_auth::sign_token(&self.config.jwt_secret, &claims, ttl)
     }
 
-    pub fn verify_token(&self, token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
-        decode::<Claims>(
-            token,
-            &DecodingKey::from_secret(self.config.jwt_secret.as_bytes()),
-            &Validation::default(),
-        )
-        .map(|data| data.claims)
+    /// 校验 JWT：委托框架 ecat-auth（含过期/弱密钥区分）。
+    pub fn verify_token(&self, token: &str) -> Result<AuthClaims, ecat_auth::JwtAuthError> {
+        ecat_auth::verify_token(&self.config.jwt_secret, token)
     }
 }
 
@@ -65,7 +55,7 @@ pub async fn auth_middleware(
     next: Next,
 ) -> Result<Response, Response> {
     // OAuth2 层已把 AuthClaims 放入 extensions（ecat_auth::OAuth2Layer）→ 直接放行
-    if req.extensions().get::<ecat_auth::AuthClaims>().is_some() {
+    if req.extensions().get::<AuthClaims>().is_some() {
         return Ok(next.run(req).await);
     }
     // X-API-Key 鉴权（内存表 hash 查询；吊销立即失效）
@@ -77,34 +67,34 @@ pub async fn auth_middleware(
     {
         let hash = crate::model::api_key::hash_key(key);
         if let Some(user_id) = state.api_keys.lookup(&hash) {
-            let claims = Claims {
+            let claims = AuthClaims {
                 sub: user_id,
-                username: "api-key".into(),
-                exp: 0,
-                iat: 0,
+                exp: None,
+                iat: None,
+                role: None,
+                extra: [(
+                    "username".to_string(),
+                    serde_json::Value::String("api-key".into()),
+                )]
+                .into_iter()
+                .collect(),
             };
             req.extensions_mut().insert(claims);
             return Ok(next.run(req).await);
         }
     }
-    let token = req
-        .headers()
-        .get(axum::http::header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|h| h.strip_prefix("Bearer "))
-        .map(str::trim)
+    let token = extract_bearer(req.headers(), axum::http::header::AUTHORIZATION.as_str())
         .filter(|t| !t.is_empty())
-        .map(str::to_string)
         .or_else(|| {
             // 浏览器 WebSocket 无法自定义 Authorization header，回退到 query token。
             // JWT 是 base64url 字符集（无 '+','/'），可直接用于 query。
             tracing::warn!("auth via query token — tokens in URLs can leak through logs");
-            extract_query_token(req.uri())
+            extract_query_param(req.uri().query(), "token")
         });
     let Some(token) = token else {
         return Err((
             StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({"error": "missing authorization token"})),
+            Json(json!({"error": "missing authorization token"})),
         )
             .into_response());
     };
@@ -113,7 +103,7 @@ pub async fn auth_middleware(
         tracing::warn!("auth rejected: {e}");
         (
             StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({"error": "invalid or expired token"})),
+            Json(json!({"error": "invalid or expired token"})),
         )
             .into_response()
     })?;
@@ -122,47 +112,48 @@ pub async fn auth_middleware(
     Ok(next.run(req).await)
 }
 
-fn extract_query_token(uri: &axum::http::Uri) -> Option<String> {
-    let query = uri.query()?;
-    for pair in query.split('&') {
-        let mut it = pair.splitn(2, '=');
-        if it.next() == Some("token") {
-            let v = it.next().unwrap_or_default();
-            if !v.is_empty() {
-                return Some(v.to_string());
-            }
-        }
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn uri(s: &str) -> axum::http::Uri {
-        s.parse().unwrap()
+    fn test_state() -> AuthState {
+        AuthState::new(AuthConfig {
+            jwt_secret: "0123456789abcdef0123456789abcdef".into(),
+            access_token_ttl: 3600,
+            refresh_token_ttl: 86400,
+        })
     }
 
     #[test]
-    fn extract_query_token_reads_token_param() {
+    fn token_roundtrip() {
+        let state = test_state();
+        let token = state.create_token("u1", "erik", 3600).unwrap();
+        let claims = state.verify_token(&token).unwrap();
+        assert_eq!(claims.subject(), "u1");
         assert_eq!(
-            extract_query_token(&uri("/exec?token=abc.def.ghi")),
-            Some("abc.def.ghi".to_string())
+            claims.extra.get("username").and_then(|v| v.as_str()),
+            Some("erik")
         );
     }
 
     #[test]
-    fn extract_query_token_ignores_other_params() {
-        assert_eq!(
-            extract_query_token(&uri("/exec?container=x&token=tok")),
-            Some("tok".to_string())
-        );
-        assert_eq!(extract_query_token(&uri("/exec?container=x")), None);
+    fn verify_rejects_tampered() {
+        let state = test_state();
+        let token = state.create_token("u1", "erik", 3600).unwrap();
+        let bad = format!("{}x", &token[..token.len() - 2]);
+        assert!(state.verify_token(&bad).is_err());
     }
 
     #[test]
-    fn extract_query_token_handles_no_query() {
-        assert_eq!(extract_query_token(&uri("/exec")), None);
+    fn create_token_rejects_weak_secret() {
+        let state = AuthState::new(AuthConfig {
+            jwt_secret: "short".into(),
+            access_token_ttl: 3600,
+            refresh_token_ttl: 86400,
+        });
+        assert!(matches!(
+            state.create_token("u1", "erik", 60),
+            Err(ecat_auth::JwtAuthError::WeakKey)
+        ));
     }
 }

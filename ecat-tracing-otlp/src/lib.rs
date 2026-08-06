@@ -26,7 +26,8 @@ pub fn init(service_name: &str, endpoint: &str) -> Result<TracerProvider, String
         .build();
     let tracer = provider.tracer("ecat");
     tracing_subscriber::registry()
-        .with(EnvFilter::from_default_env())
+        // 无 RUST_LOG 时默认 info：空 EnvFilter 会过滤掉全部事件与 span（含 HTTP span）
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .with(tracing_subscriber::fmt::layer())
         .with(tracing_opentelemetry::layer().with_tracer(tracer))
         .try_init()

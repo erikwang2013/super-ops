@@ -32,6 +32,7 @@ use ecat_transport_http::HttpServer;
 use sqlx::mysql::MySqlPool;
 use std::sync::{Arc, Mutex, RwLock};
 use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -164,29 +165,34 @@ async fn main() -> anyhow::Result<()> {
         );
     let state_start = state.clone();
 
-    let app = Router::new()
-        .route("/api/health", get(health))
-        .route("/api/docs", get(docs))
-        .route("/api/auth/register", post(register))
-        .merge(login_limited)
-        .merge(k8s)
-        .merge(keys)
-        .layer(middleware::from_fn(metrics::count_requests))
-        .layer(
-            CorsLayer::new()
-                .allow_origin([
-                    HeaderValue::from_static("http://localhost:3000"),
-                    HeaderValue::from_static("http://tauri.localhost"),
-                    HeaderValue::from_static("tauri://localhost"),
-                ])
-                .allow_methods([Method::GET, Method::POST, Method::DELETE])
-                .allow_headers([
-                    axum::http::header::AUTHORIZATION,
-                    axum::http::header::CONTENT_TYPE,
-                ]),
-        )
-        .with_state(state)
-        .merge(health::health_router(pool.clone()).await);
+    let app =
+        Router::new()
+            .route("/api/health", get(health))
+            .route("/api/docs", get(docs))
+            .route("/api/auth/register", post(register))
+            .merge(login_limited)
+            .merge(k8s)
+            .merge(keys)
+            .layer(middleware::from_fn(metrics::count_requests))
+            // INFO 级 span：确保经 EnvFilter 后仍进入 tracing→OTLP 导出链路（Jaeger 可见）
+            .layer(TraceLayer::new_for_http().make_span_with(
+                tower_http::trace::DefaultMakeSpan::new().level(tracing::Level::INFO),
+            ))
+            .layer(
+                CorsLayer::new()
+                    .allow_origin([
+                        HeaderValue::from_static("http://localhost:3000"),
+                        HeaderValue::from_static("http://tauri.localhost"),
+                        HeaderValue::from_static("tauri://localhost"),
+                    ])
+                    .allow_methods([Method::GET, Method::POST, Method::DELETE])
+                    .allow_headers([
+                        axum::http::header::AUTHORIZATION,
+                        axum::http::header::CONTENT_TYPE,
+                    ]),
+            )
+            .with_state(state)
+            .merge(health::health_router(pool.clone()).await);
 
     let http = HttpServer::new(format!("0.0.0.0:{}", config.server.http_port)).router(app);
 

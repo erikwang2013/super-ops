@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.2.2] — 2026-08-06 — 认证迁移至 e-cat 框架
+
+### Changed
+- gateway JWT 签发/校验迁移到框架 ecat-auth：新增框架级 `sign_token`/`verify_token` API（HS256、基于 `AuthClaims`、密钥 ≥32 字节强制校验），gateway 删除自研 `Claims` 结构与 jsonwebtoken/chrono 直接依赖；`JwtAuthService` 内部复用 `verify_token`
+- 凭证链改用框架 helpers（`extract_bearer`/`extract_query_param`），X-API-Key 与 OAuth2 统一注入框架 `AuthClaims` 类型（此前 OAuth2 短路用 `AuthClaims`、JWT/API Key 用自研 `Claims`，双类型并存）
+- 开发默认 JWT 密钥提升至 ≥32 字节（`change-me-in-production-0123456789abcdef`），适配框架 WeakKey 校验；README/架构图同步（认证链路已全部基于 ecat-auth）
+
+### Fixed
+- 迁移后旧默认密钥（24 字节）触发框架 `JwtAuthError::WeakKey` 拒绝签发 → 登录 500；已换用合规开发密钥并更新 config.rs 哨兵检查
+
+### Verified
+- workspace 296 项测试全过（ecat-auth +6 项：签发/校验 roundtrip、extra claims、过期、篡改、弱密钥、错密钥）
+- 运行时回归：login → JWT 200、伪造/缺失 token 401、API Key 创建/使用/删除/吊销 200/204/401、query token 回退 200
+
+## [1.2.1] — 2026-08-06 — 修复与文档
+
+### Fixed
+- gateway 挂载 HTTP 追踪层（TraceLayer，INFO 级 span）：此前 tower-http 已启用 `trace` 特性但从未使用，OTLP 链路无请求级 span 源，Jaeger 收不到 gateway 追踪
+- `ecat-tracing-otlp` EnvFilter 对齐 `ecat-logging`：无 `RUST_LOG` 时回退 `info`（此前空 filter 过滤全部事件与 span，含 HTTP span）
+- `deploy/init.sql` 幂等：`CREATE INDEX`（MySQL 8 无 `IF NOT EXISTS`）改为内嵌于 `CREATE TABLE IF NOT EXISTS` 的 KEY 定义，重跑不再中断
+
+### Changed
+- README.md / README.en.md 重写：项目说明、技术架构（含 `docs/images/architecture.svg` 架构图）、项目结构、功能说明、端口/配置/测试/已知边界
+- 运行时验证补完：Consul KV 热更新双向生效（阈值 3↔10）、Jaeger span 可见、Prometheus target up
+
 ## [1.2.0] — 2026-08-06 — SuperOps P3 集成与对外
 
 ### Added

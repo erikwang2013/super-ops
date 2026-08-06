@@ -13,17 +13,75 @@ use tower::{Layer, Service};
 pub enum JwtAuthError {
     /// The shared secret is shorter than 32 bytes, which is too weak for HS256.
     WeakKey,
+    /// The token failed to decode or verify (bad signature, malformed, …).
+    Invalid(String),
+    /// The token signature was valid but the token has expired.
+    Expired,
 }
 
 impl std::fmt::Display for JwtAuthError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::WeakKey => write!(f, "JWT secret must be at least 32 bytes for HS256"),
+            Self::Invalid(msg) => write!(f, "invalid JWT: {msg}"),
+            Self::Expired => write!(f, "JWT has expired"),
         }
     }
 }
 
 impl std::error::Error for JwtAuthError {}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Sign a token with HS256 using the given secret (must be ≥ 32 bytes).
+///
+/// `iat`/`exp` are derived from `now` and `ttl_secs`, overriding any values
+/// carried on the passed claims.
+pub fn sign_token(
+    secret: &str,
+    claims: &AuthClaims,
+    ttl_secs: u64,
+) -> Result<String, JwtAuthError> {
+    if secret.len() < 32 {
+        return Err(JwtAuthError::WeakKey);
+    }
+    let now = now_secs();
+    let mut claims = claims.clone();
+    claims.iat = Some(now);
+    claims.exp = Some(now.saturating_add(ttl_secs));
+    jsonwebtoken::encode(
+        &jsonwebtoken::Header::default(),
+        &claims,
+        &jsonwebtoken::EncodingKey::from_secret(secret.as_bytes()),
+    )
+    .map_err(|e| JwtAuthError::Invalid(e.to_string()))
+}
+
+/// Verify and decode a token, returning the claims on success.
+pub fn verify_token(secret: &str, token: &str) -> Result<AuthClaims, JwtAuthError> {
+    if secret.len() < 32 {
+        return Err(JwtAuthError::WeakKey);
+    }
+    let validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
+    jsonwebtoken::decode::<AuthClaims>(
+        token,
+        &jsonwebtoken::DecodingKey::from_secret(secret.as_bytes()),
+        &validation,
+    )
+    .map(|d| d.claims)
+    .map_err(|e| {
+        if matches!(e.kind(), jsonwebtoken::errors::ErrorKind::ExpiredSignature) {
+            JwtAuthError::Expired
+        } else {
+            JwtAuthError::Invalid(e.to_string())
+        }
+    })
+}
 
 enum JwtSecret {
     Shared(Vec<u8>),
@@ -117,28 +175,22 @@ where
                 }
             };
 
-            let secret_bytes = match config.secret.as_ref() {
-                JwtSecret::Shared(b) => b,
-                JwtSecret::RsaReserved(b) => b,
+            let secret = match config.secret.as_ref() {
+                JwtSecret::Shared(b) => String::from_utf8_lossy(b).into_owned(),
+                JwtSecret::RsaReserved(b) => String::from_utf8_lossy(b).into_owned(),
             };
 
-            let validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
-            let token_data = match jsonwebtoken::decode::<AuthClaims>(
-                &token,
-                &jsonwebtoken::DecodingKey::from_secret(secret_bytes),
-                &validation,
-            ) {
-                Ok(data) => data,
+            let claims = match verify_token(&secret, &token) {
+                Ok(c) => c,
+                Err(JwtAuthError::Expired) => {
+                    tracing::warn!("jwt token expired");
+                    return Ok(Response::builder()
+                        .status(StatusCode::UNAUTHORIZED)
+                        .body(axum::body::Body::from(r#"{"error":"invalid token"}"#))
+                        .unwrap());
+                }
                 Err(e) => {
-                    // Distinguish expiry in the logs without leaking
-                    // jsonwebtoken internals to clients.
-                    let expired =
-                        matches!(e.kind(), jsonwebtoken::errors::ErrorKind::ExpiredSignature);
-                    tracing::warn!(
-                        error = %e,
-                        expired,
-                        "jwt validation failed"
-                    );
+                    tracing::warn!(error = %e, "jwt validation failed");
                     return Ok(Response::builder()
                         .status(StatusCode::UNAUTHORIZED)
                         .body(axum::body::Body::from(r#"{"error":"invalid token"}"#))
@@ -148,9 +200,9 @@ where
 
             for claim in &config.required_claims {
                 let satisfied = match claim.as_str() {
-                    "sub" => !token_data.claims.sub.is_empty(),
-                    "role" => token_data.claims.role.is_some(),
-                    _ => token_data.claims.extra.contains_key(claim),
+                    "sub" => !claims.sub.is_empty(),
+                    "role" => claims.role.is_some(),
+                    _ => claims.extra.contains_key(claim),
                 };
                 if !satisfied {
                     return Ok(Response::builder()
@@ -162,7 +214,6 @@ where
                 }
             }
 
-            let claims = token_data.claims;
             let mut req = req;
             req.extensions_mut().insert(claims);
             inner.call(req).await.map_err(|e| Box::new(e) as _)

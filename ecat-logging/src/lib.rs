@@ -11,10 +11,12 @@ pub fn init() {
     let env_layer = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
 
-    tracing_subscriber::registry()
+    // try_init: 上层（如 ecat-tracing-otlp）可能已设置 global dispatcher，
+    // 重复 .init() 会 panic，重复初始化时静默忽略
+    let _ = tracing_subscriber::registry()
         .with(env_layer)
         .with(fmt_layer)
-        .init();
+        .try_init();
 }
 
 #[cfg(test)]

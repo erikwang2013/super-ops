@@ -856,10 +856,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
 dependencies = [
  "iana-time-zone",
- "js-sys",
  "num-traits",
  "serde",
- "wasm-bindgen",
  "windows-link",
 ]
 
@@ -5999,7 +5997,6 @@ dependencies = [
  "axum 0.8.9",
  "axum-extra",
  "bcrypt",
- "chrono",
  "ecat",
  "ecat-auth",
  "ecat-circuit-breaker",
@@ -6019,7 +6016,6 @@ dependencies = [
  "ecat-tracing-otlp",
  "ecat-transport-http",
  "futures",
- "jsonwebtoken",
  "prometheus",
  "prost",
  "serde",

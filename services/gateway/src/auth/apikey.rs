@@ -1,10 +1,10 @@
 use crate::AppState;
-use crate::auth::middleware::Claims;
 use axum::{
     Json,
     extract::{Extension, Path, State},
     http::StatusCode,
 };
+use ecat_auth::AuthClaims;
 use serde_json::Value;
 
 type ApiError = (StatusCode, Json<Value>);
@@ -15,7 +15,7 @@ fn err(status: StatusCode, message: &str) -> ApiError {
 
 pub async fn create_key(
     State(state): State<AppState>,
-    Extension(claims): Extension<Claims>,
+    Extension(claims): Extension<AuthClaims>,
     Json(body): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
     let name = body
@@ -29,7 +29,7 @@ pub async fn create_key(
     }
     let (id, plain) = state
         .api_keys
-        .create(&claims.sub, &name)
+        .create(claims.subject(), &name)
         .await
         .map_err(|_| {
             err(
@@ -47,11 +47,11 @@ pub async fn create_key(
 
 pub async fn list_keys(
     State(state): State<AppState>,
-    Extension(claims): Extension<Claims>,
+    Extension(claims): Extension<AuthClaims>,
 ) -> Result<Json<Value>, ApiError> {
     let keys = state
         .api_keys
-        .list(&claims.sub)
+        .list(claims.subject())
         .await
         .map_err(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "failed to list api keys"))?;
     Ok(Json(serde_json::json!({ "keys": keys })))
@@ -59,15 +59,19 @@ pub async fn list_keys(
 
 pub async fn delete_key(
     State(state): State<AppState>,
-    Extension(claims): Extension<Claims>,
+    Extension(claims): Extension<AuthClaims>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    let deleted = state.api_keys.delete(&id, &claims.sub).await.map_err(|_| {
-        err(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "failed to delete api key",
-        )
-    })?;
+    let deleted = state
+        .api_keys
+        .delete(&id, claims.subject())
+        .await
+        .map_err(|_| {
+            err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "failed to delete api key",
+            )
+        })?;
     if deleted {
         Ok(StatusCode::NO_CONTENT)
     } else {
