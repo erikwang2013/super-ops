@@ -95,10 +95,10 @@ pub fn email_body_with_oncall(events: &[AlertEvent], oncall: Option<&str>) -> St
     for e in events {
         lines.push(format!("[{}] {} — {}", e.level, e.title, e.message));
     }
-    if let Some(assignee) = oncall {
-        if !assignee.trim().is_empty() {
-            lines.push(format!("当前值班: {assignee}"));
-        }
+    if let Some(assignee) = oncall
+        && !assignee.trim().is_empty()
+    {
+        lines.push(format!("当前值班: {assignee}"));
     }
     lines.join("\n")
 }
@@ -193,10 +193,10 @@ pub async fn dispatch_with_oncall(
         .await;
     }
     let mut payload = build_payload(&target.kind, &filtered);
-    if let Some(assignee) = oncall {
-        if !assignee.trim().is_empty() {
-            payload["oncall"] = serde_json::Value::String(assignee.to_string());
-        }
+    if let Some(assignee) = oncall
+        && !assignee.trim().is_empty()
+    {
+        payload["oncall"] = serde_json::Value::String(assignee.to_string());
     }
     let resp = http
         .post(&target.url)

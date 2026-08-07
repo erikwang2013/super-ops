@@ -1,16 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 760" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 814" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif" font-size="13">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#64748b"/>
     </marker>
   </defs>
 
-  <rect x="0" y="0" width="1100" height="720" fill="#ffffff"/>
+  <rect x="0" y="0" width="1100" height="814" fill="#ffffff"/>
   <text x="20" y="30" font-size="18" font-weight="bold" fill="#0f172a">SuperOps 功能结构</text>
   <text x="20" y="50" font-size="12" fill="#64748b">四个模块：gateway（接入）/ k8s（集群）/ collector（采集）/ frontend（展示），全部基于 e-cat 框架</text>
 
   <!-- Gateway -->
-  <rect x="60" y="80" width="250" height="488" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="60" y="80" width="250" height="520" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
   <rect x="60" y="80" width="250" height="28" rx="8" fill="#0f172a"/>
   <rect x="60" y="94" width="250" height="14" fill="#0f172a"/>
   <text x="185" y="99" text-anchor="middle" font-weight="bold" fill="#ffffff">Gateway :8080 / :9090</text>
@@ -29,17 +29,19 @@
   <text x="80" y="364" fill="#94a3b8" font-size="11.5">/metrics 指标 · /api/docs 文档</text>
   <text x="80" y="388" fill="#334155">security.rs</text>
   <text x="80" y="404" fill="#94a3b8" font-size="11.5">WAF 攻击扫描（ecat-security，最外层）</text>
-  <text x="80" y="428" fill="#334155">cmdb/logs/scripts/quota/chaos/release API</text>
-  <text x="80" y="444" fill="#94a3b8" font-size="11.5">日志检索 · CMDB · 脚本库 · 配额 · 混沌 · 发布回滚</text>
-  <text x="80" y="468" fill="#334155">config.rs</text>
-  <text x="80" y="484" fill="#94a3b8" font-size="11.5">配置 + 哨兵检查</text>
-  <text x="80" y="508" fill="#334155">Consul 注册 / KV 热更新</text>
-  <text x="80" y="524" fill="#94a3b8" font-size="11.5">ecat-config-remote</text>
-  <text x="80" y="548" fill="#334155">写操作（scale/restart/delete）</text>
-  <text x="80" y="564" fill="#94a3b8" font-size="11.5">→ gRPC RPC + Kafka 审计发布</text>
+  <text x="80" y="428" fill="#334155">cmdb/logs/scripts/quota/</text>
+  <text x="80" y="442" fill="#334155">chaos/release API</text>
+  <text x="80" y="456" fill="#94a3b8" font-size="11.5">日志检索 · CMDB · 脚本库 · 配额</text>
+  <text x="80" y="470" fill="#94a3b8" font-size="11.5">· 混沌 · 发布回滚</text>
+  <text x="80" y="486" fill="#334155">config.rs</text>
+  <text x="80" y="502" fill="#94a3b8" font-size="11.5">配置 + 哨兵检查</text>
+  <text x="80" y="526" fill="#334155">Consul 注册 / KV 热更新</text>
+  <text x="80" y="542" fill="#94a3b8" font-size="11.5">ecat-config-remote</text>
+  <text x="80" y="566" fill="#334155">写操作（scale/restart/delete）</text>
+  <text x="80" y="582" fill="#94a3b8" font-size="11.5">→ gRPC RPC + Kafka 审计发布</text>
 
   <!-- K8s -->
-  <rect x="340" y="80" width="250" height="488" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="340" y="80" width="250" height="520" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
   <rect x="340" y="80" width="250" height="28" rx="8" fill="#0f172a"/>
   <rect x="340" y="94" width="250" height="14" fill="#0f172a"/>
   <text x="465" y="99" text-anchor="middle" font-weight="bold" fill="#ffffff">K8s Service :9091</text>
@@ -66,7 +68,7 @@
   <text x="360" y="524" fill="#94a3b8" font-size="11.5">RunJob 批量执行</text>
 
   <!-- Collector -->
-  <rect x="620" y="80" width="250" height="488" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="620" y="80" width="250" height="520" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
   <rect x="620" y="80" width="250" height="28" rx="8" fill="#0f172a"/>
   <rect x="620" y="94" width="250" height="14" fill="#0f172a"/>
   <text x="745" y="99" text-anchor="middle" font-weight="bold" fill="#ffffff">Collector</text>
@@ -91,11 +93,12 @@
   <text x="640" y="484" fill="#94a3b8" font-size="11.5">ecat-mq-kafka</text>
   <text x="640" y="508" fill="#334155">健康 / 指标</text>
   <text x="640" y="524" fill="#94a3b8" font-size="11.5">ecat-health / ecat-metrics</text>
-  <text x="640" y="548" fill="#334155">notify.rs / drift.rs / rollback.rs</text>
-  <text x="640" y="564" fill="#94a3b8" font-size="11.5">告警通知 / 漂移检测 / 发布自动回滚</text>
+  <text x="640" y="548" fill="#334155">notify.rs / drift.rs</text>
+  <text x="640" y="560" fill="#334155">rollback.rs</text>
+  <text x="640" y="576" fill="#94a3b8" font-size="11.5">告警通知 / 漂移检测 / 发布自动回滚</text>
 
   <!-- Frontend -->
-  <rect x="900" y="80" width="180" height="488" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+  <rect x="900" y="80" width="180" height="520" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
   <rect x="900" y="80" width="180" height="28" rx="8" fill="#1e40af"/>
   <rect x="900" y="94" width="180" height="14" fill="#1e40af"/>
   <text x="990" y="99" text-anchor="middle" font-weight="bold" fill="#ffffff">Frontend :3000</text>
@@ -114,23 +117,26 @@
   <text x="918" y="376" fill="#334155">vite 构建</text>
   <text x="918" y="392" fill="#94a3b8" font-size="11.5">tsc + vite build</text>
   <text x="918" y="418" fill="#334155">pages/ops/</text>
-  <text x="918" y="434" fill="#94a3b8" font-size="11.5">审计 / API Keys / 用户 / 脚本 / 混沌 / 配额</text>
-  <text x="918" y="458" fill="#334155">pages/cmdb/</text>
-  <text x="918" y="474" fill="#94a3b8" font-size="11.5">资产台账（ProTable）</text>
-  <text x="918" y="498" fill="#334155">dashboard.tsx</text>
-  <text x="918" y="514" fill="#94a3b8" font-size="11.5">集群/主机/告警真实数据</text>
+  <text x="918" y="434" fill="#94a3b8" font-size="11.5">审计 / API Keys /</text>
+  <text x="918" y="450" fill="#94a3b8" font-size="11.5">用户 / 脚本 / 混沌 / 配额</text>
+  <text x="918" y="474" fill="#334155">pages/cmdb/</text>
+  <text x="918" y="490" fill="#94a3b8" font-size="11.5">资产台账（ProTable）</text>
+  <text x="918" y="514" fill="#334155">dashboard.tsx</text>
+  <text x="918" y="530" fill="#94a3b8" font-size="11.5">集群/主机/告警真实数据</text>
 
   <!-- 框架 -->
-  <rect x="60" y="570" width="1020" height="94" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
-  <rect x="60" y="570" width="1020" height="28" rx="8" fill="#0f172a"/>
-  <rect x="60" y="584" width="1020" height="14" fill="#0f172a"/>
-  <text x="80" y="589" font-weight="bold" fill="#ffffff">e-cat 框架组件（37 处 ecat 依赖）</text>
-  <text x="80" y="618" fill="#334155">ecat-auth · ecat-middleware · ecat-circuit-breaker · ecat-config-remote · ecat-config</text>
-  <text x="80" y="638" fill="#334155">ecat-registry(-consul) · ecat-mq(-kafka) · ecat-scheduler · ecat-lock · ecat-data(-sqlx/-clickhouse/-redis) · ecat-tracing-otlp · ecat-openapi</text>
-  <text x="80" y="656" fill="#334155">ecat-security · ecat-tls · ecat-bench</text>
+  <rect x="60" y="604" width="1020" height="112" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="60" y="604" width="1020" height="28" rx="8" fill="#0f172a"/>
+  <rect x="60" y="618" width="1020" height="14" fill="#0f172a"/>
+  <text x="80" y="623" font-weight="bold" fill="#ffffff">e-cat 框架组件（37 处 ecat 依赖）</text>
+  <text x="80" y="646" fill="#334155">ecat-auth · ecat-middleware · ecat-circuit-breaker · ecat-config-remote · ecat-config</text>
+  <text x="80" y="666" fill="#334155">ecat-registry(-consul) · ecat-mq(-kafka) · ecat-scheduler · ecat-lock</text>
+  <text x="80" y="684" fill="#334155">ecat-data(-sqlx/-clickhouse/-redis) · ecat-tracing-otlp · ecat-openapi</text>
+  <text x="80" y="702" fill="#334155">ecat-security · ecat-tls · ecat-bench</text>
 
   <!-- 验证 -->
-  <rect x="60" y="670" width="1020" height="54" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
-  <text x="80" y="692" font-weight="bold" fill="#1e40af">验证状态</text>
-  <text x="80" y="712" fill="#334155">workspace 408 项测试通过 · cargo fmt / check 零警告 · e2e 21/21 · 安全专项 15/15 · 前端 tsc + build 通过</text>
+  <rect x="60" y="724" width="1020" height="80" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+  <text x="80" y="748" font-weight="bold" fill="#1e40af">验证状态</text>
+  <text x="80" y="772" fill="#334155">workspace 408 项测试通过 · cargo fmt / check 零警告 · e2e 21/21 · 安全专项 15/15</text>
+  <text x="80" y="790" fill="#334155">前端 tsc + build 通过</text>
 </svg>

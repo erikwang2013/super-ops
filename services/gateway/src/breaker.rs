@@ -74,10 +74,10 @@ where
                 .map_err(|e| std::io::Error::other(e.to_string()))?;
             let response = resp.into_response();
             if response.status().is_server_error() {
-                Err(
-                    std::io::Error::other(format!("upstream returned {}", response.status()))
-                        .into(),
-                )
+                Err(std::io::Error::other(format!(
+                    "upstream returned {}",
+                    response.status()
+                )))
             } else {
                 Ok(response)
             }

@@ -37,7 +37,9 @@ where
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner
             .poll_ready(cx)
-            .map_err(|_| -> std::convert::Infallible { unreachable!("inner poll_ready is infallible") })
+            .map_err(|_| -> std::convert::Infallible {
+                unreachable!("inner poll_ready is infallible")
+            })
     }
 
     fn call(&mut self, req: Request<B>) -> Self::Future {

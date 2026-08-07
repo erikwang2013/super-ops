@@ -6,9 +6,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::model::quota::{
-    delete_quota, list_quotas, upsert_quota, validate_quota,
-};
+use crate::model::quota::{QuotaArgs, delete_quota, list_quotas, upsert_quota, validate_quota};
 use crate::model::tenant::Tenant;
 
 #[derive(Debug, Default, Deserialize)]
@@ -72,14 +70,16 @@ pub async fn create_quota(
     }
     match upsert_quota(
         &state.pool,
-        &req.cluster_id,
-        &req.namespace,
-        &req.cpu_request,
-        &req.memory_request,
-        &req.cpu_limit,
-        &req.memory_limit,
-        req.replicas,
-        &req.description,
+        QuotaArgs {
+            cluster_id: &req.cluster_id,
+            namespace: &req.namespace,
+            cpu_request: &req.cpu_request,
+            memory_request: &req.memory_request,
+            cpu_limit: &req.cpu_limit,
+            memory_limit: &req.memory_limit,
+            replicas: req.replicas,
+            description: &req.description,
+        },
     )
     .await
     {

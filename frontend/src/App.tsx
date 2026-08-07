@@ -1,39 +1,41 @@
+import { lazy, Suspense } from 'react';
 import { ProLayout, PageContainer } from '@ant-design/pro-components';
 import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom';
 import { DashboardOutlined, CloudServerOutlined, DatabaseOutlined, SettingOutlined } from '@ant-design/icons';
 import { useAuthStore } from './stores/auth';
 import LoginPage from './pages/login';
-import Dashboard from './pages/dashboard';
-import ClustersPage from './pages/k8s/clusters';
-import ClusterDetail from './pages/k8s/cluster-detail';
-import PodsPage from './pages/k8s/pods';
-import DeploymentsPage from './pages/k8s/deployments';
-import NodesPage from './pages/k8s/nodes';
-import TerminalPage from './pages/k8s/terminal';
-import AuditPage from './pages/ops/audit';
-import ApiKeysPage from './pages/ops/apikeys';
-import UsersPage from './pages/ops/users';
-import CmdbPage from './pages/cmdb';
-import ScriptsPage from './pages/ops/scripts';
-import AlertsPage from './pages/ops/alerts';
-import AlertRulesPage from './pages/ops/alert-rules';
-import MetricsPage from './pages/ops/metrics';
-import LogsPage from './pages/ops/logs';
-import RecordingsPage from './pages/ops/recordings';
-import ApprovalsPage from './pages/ops/approvals';
-import SecretsPage from './pages/ops/secrets';
-import FilesPage from './pages/ops/files';
-import OncallPage from './pages/ops/oncall';
-import TracesPage from './pages/ops/traces';
-import TicketsPage from './pages/ops/tickets';
-import ReleasesPage from './pages/ops/releases';
-import RunbooksPage from './pages/ops/runbooks';
-import CapacityPage from './pages/ops/capacity';
-import BackupsPage from './pages/ops/backups';
-import ConfigPage from './pages/ops/config';
-import ChaosPage from './pages/ops/chaos';
-import QuotaPage from './pages/ops/quota';
-import GrafanaPage from './pages/ops/grafana';
+
+const Dashboard = lazy(() => import('./pages/dashboard'));
+const ClustersPage = lazy(() => import('./pages/k8s/clusters'));
+const ClusterDetail = lazy(() => import('./pages/k8s/cluster-detail'));
+const PodsPage = lazy(() => import('./pages/k8s/pods'));
+const DeploymentsPage = lazy(() => import('./pages/k8s/deployments'));
+const NodesPage = lazy(() => import('./pages/k8s/nodes'));
+const TerminalPage = lazy(() => import('./pages/k8s/terminal'));
+const AuditPage = lazy(() => import('./pages/ops/audit'));
+const ApiKeysPage = lazy(() => import('./pages/ops/apikeys'));
+const UsersPage = lazy(() => import('./pages/ops/users'));
+const CmdbPage = lazy(() => import('./pages/cmdb'));
+const ScriptsPage = lazy(() => import('./pages/ops/scripts'));
+const AlertsPage = lazy(() => import('./pages/ops/alerts'));
+const AlertRulesPage = lazy(() => import('./pages/ops/alert-rules'));
+const MetricsPage = lazy(() => import('./pages/ops/metrics'));
+const LogsPage = lazy(() => import('./pages/ops/logs'));
+const RecordingsPage = lazy(() => import('./pages/ops/recordings'));
+const ApprovalsPage = lazy(() => import('./pages/ops/approvals'));
+const SecretsPage = lazy(() => import('./pages/ops/secrets'));
+const FilesPage = lazy(() => import('./pages/ops/files'));
+const OncallPage = lazy(() => import('./pages/ops/oncall'));
+const TracesPage = lazy(() => import('./pages/ops/traces'));
+const TicketsPage = lazy(() => import('./pages/ops/tickets'));
+const ReleasesPage = lazy(() => import('./pages/ops/releases'));
+const RunbooksPage = lazy(() => import('./pages/ops/runbooks'));
+const CapacityPage = lazy(() => import('./pages/ops/capacity'));
+const BackupsPage = lazy(() => import('./pages/ops/backups'));
+const ConfigPage = lazy(() => import('./pages/ops/config'));
+const ChaosPage = lazy(() => import('./pages/ops/chaos'));
+const QuotaPage = lazy(() => import('./pages/ops/quota'));
+const GrafanaPage = lazy(() => import('./pages/ops/grafana'));
 
 const menuData = [
   { path: '/dashboard', name: '总览', icon: <DashboardOutlined /> },
@@ -68,6 +70,7 @@ export default function App() {
       onMenuHeaderClick={() => nav('/dashboard')}
       menuItemRender={(item, dom) => <Link to={item.path || '/'}>{dom}</Link>}>
       <PageContainer>
+        <Suspense fallback={<div style={{ padding: 48, textAlign: 'center', color: '#94a3b8' }}>加载中…</div>}>
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/k8s/clusters" element={<ClustersPage />} />
@@ -101,6 +104,7 @@ export default function App() {
           <Route path="/ops/quota" element={<QuotaPage />} />
           <Route path="/ops/grafana" element={<GrafanaPage />} />
         </Routes>
+        </Suspense>
       </PageContainer>
     </ProLayout>
   );

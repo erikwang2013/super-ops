@@ -116,10 +116,10 @@ impl ConsulConfigSource {
                     Ok((map, new_index)) => {
                         // 首帧（index=None）强制推送：兼容缺失 X-Consul-Index 的服务器，
                         // 否则 None != None 恒为 false 会丢首帧并形成无退避的紧循环。
-                        if index.as_deref() != new_index.as_deref() || index.is_none() {
-                            if tx.send(Ok(map)).await.is_err() {
-                                break; // receiver dropped
-                            }
+                        if (index.as_deref() != new_index.as_deref() || index.is_none())
+                            && tx.send(Ok(map)).await.is_err()
+                        {
+                            break; // receiver dropped
                         }
                         index = new_index;
                     }
@@ -167,6 +167,8 @@ mod tests {
     use super::*;
     use axum::extract::State;
     use std::sync::Arc;
+
+    type KvFrame = (u64, Vec<(String, String)>);
     use std::sync::atomic::{AtomicBool, Ordering};
     use tokio::sync::watch;
 
@@ -183,7 +185,7 @@ mod tests {
         assert_eq!(String::from_utf8(result).unwrap(), "hello");
     }
 
-    async fn spawn_mock_consul() -> (String, watch::Sender<(u64, Vec<(String, String)>)>) {
+    async fn spawn_mock_consul() -> (String, watch::Sender<KvFrame>) {
         let (tx, rx) =
             watch::channel((1u64, vec![("app/key".to_string(), "{\"a\":1}".to_string())]));
         let app = axum::Router::new()
@@ -198,7 +200,7 @@ mod tests {
     }
 
     async fn kv_handler(
-        State(mut rx): State<watch::Receiver<(u64, Vec<(String, String)>)>>,
+        State(mut rx): State<watch::Receiver<KvFrame>>,
         axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
     ) -> axum::response::Response {
         let requested: u64 = params
@@ -292,7 +294,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(second.get("key2"), Some(&serde_json::json!({"b": 2})));
-        assert!(second.get("key").is_none());
+        assert!(!second.contains_key("key"));
     }
 
     #[tokio::test]

@@ -7,7 +7,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::model::cmdb::{
-    asset_type_counts, delete_asset, list_assets, upsert_asset, validate_asset,
+    AssetArgs, asset_type_counts, delete_asset, list_assets, upsert_asset, validate_asset,
 };
 use crate::model::tenant::Tenant;
 
@@ -67,13 +67,15 @@ pub async fn create_cmdb_asset(
     }
     match upsert_asset(
         &state.pool,
-        &tenant.0,
-        &req.asset_type,
-        &req.name,
-        req.ip.as_deref(),
-        req.env.as_deref().unwrap_or("prod"),
-        req.owner.as_deref().unwrap_or(""),
-        req.labels.as_deref(),
+        AssetArgs {
+            tenant: &tenant.0,
+            asset_type: &req.asset_type,
+            name: &req.name,
+            ip: req.ip.as_deref(),
+            env: req.env.as_deref().unwrap_or("prod"),
+            owner: req.owner.as_deref().unwrap_or(""),
+            labels: req.labels.as_deref(),
+        },
     )
     .await
     {

@@ -510,7 +510,10 @@ pub async fn app(
                 axum::routing::get(crate::chaos_api::list_chaos_handler)
                     .post(crate::chaos_api::create_chaos_handler),
             )
-            .route("/api/chaos/{id}", axum::routing::delete(crate::chaos_api::delete_chaos_handler))
+            .route(
+                "/api/chaos/{id}",
+                axum::routing::delete(crate::chaos_api::delete_chaos_handler),
+            )
             .route(
                 "/api/chaos/{id}/run",
                 axum::routing::post(crate::chaos_api::run_chaos_handler),
@@ -605,10 +608,7 @@ pub async fn app(
         .layer(
             tower::ServiceBuilder::new()
                 .layer(crate::security::SecurityErrorToResponseLayer)
-                .layer(
-                    ecat_security::SecurityBodyLayer::new()
-                        .body_limit(10 * 1024 * 1024),
-                ),
+                .layer(ecat_security::SecurityBodyLayer::new().body_limit(10 * 1024 * 1024)),
         )
         .with_state(state)
         .merge(crate::health::health_router(pool).await))

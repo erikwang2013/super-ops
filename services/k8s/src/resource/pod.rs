@@ -28,9 +28,11 @@ pub async fn get_pod_logs(
     follow: bool,
 ) -> Result<impl tokio_stream::Stream<Item = String>> {
     let api: Api<Pod> = Api::namespaced(client.client.clone(), &namespace);
-    let mut params = LogParams::default();
-    params.follow = follow;
-    params.container = container;
+    let mut params = LogParams {
+        follow,
+        container,
+        ..Default::default()
+    };
     if let Some(t) = tail_lines {
         params.tail_lines = Some(t);
     }
@@ -40,10 +42,10 @@ pub async fn get_pod_logs(
     tokio::spawn(async move {
         let mut lines = log_stream.lines();
         while let Some(line) = lines.next().await {
-            if let Ok(line) = line {
-                if tx.send(line).await.is_err() {
-                    break;
-                }
+            if let Ok(line) = line
+                && tx.send(line).await.is_err()
+            {
+                break;
             }
         }
     });
@@ -64,10 +66,10 @@ pub async fn watch_pods(
         let w = watcher(api, Default::default());
         futures::pin_mut!(w);
         while let Some(event) = w.next().await {
-            if let Ok(event) = event {
-                if tx.send(event).await.is_err() {
-                    break;
-                }
+            if let Ok(event) = event
+                && tx.send(event).await.is_err()
+            {
+                break;
             }
         }
     });

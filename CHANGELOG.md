@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.1] — 2026-08-07 — 修复轮（clippy 零警告 + 前端代码拆分 + 图集修整）
+
+### Fixed
+- workspace `cargo clippy --all-targets` 降至零警告（ecat-* 与三个服务 crate）
+- `docs/images/` 图集修整：tree / structure / flow / design / architecture 五个 SVG 按真实字体度量（tree 等宽 12px/字符，其余比例 13px·CJK / 7.8px·Latin / 3.9px·空格）修复文本溢出——长行换行、盒与画布边界按需增大（tree.svg 画布 960→1012、structure.svg 盒区增高）；全部经 XML 完整性 + 溢出脚本复验零溢出；security / lifecycle 两图验证无溢出未改动
+- 前端构建：React.lazy 路由级代码拆分 + Vite manualChunks 供应商分包（vendor-antd 786.5kB / index 15.3kB），构建零警告
+
+### Verified
+- workspace 408 项测试全过（0 失败）；`cargo fmt --check` / `cargo clippy --all-targets` / 前端 `tsc` + `npm run build` 全绿
+
 ## [1.7.0] — 2026-08-07 — 扩展点实施（安全纵深 + 发布闭环 + 告警精细化 + 长尾）
 
 ### Added

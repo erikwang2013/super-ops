@@ -80,9 +80,9 @@ pub async fn rollback_once(cfg: &Config) -> anyhow::Result<()> {
         .deployments;
     let mut rolled = 0usize;
     for t in &targets {
-        let dep = deps.iter().find(|d| {
-            d.name == t.name && (d.namespace.is_empty() || d.namespace == t.namespace)
-        });
+        let dep = deps
+            .iter()
+            .find(|d| d.name == t.name && (d.namespace.is_empty() || d.namespace == t.namespace));
         if !unhealthy(dep.map(|d| (d.name.as_str(), d.replicas, d.ready_replicas))) {
             continue;
         }
@@ -115,7 +115,9 @@ pub async fn rollback_once(cfg: &Config) -> anyhow::Result<()> {
                 rolled += 1;
                 tracing::warn!(deployment = %t.name, image = %t.old_image, "auto rollback triggered");
             }
-            Err(e) => tracing::warn!(deployment = %t.name, error = %e, "auto rollback update failed"),
+            Err(e) => {
+                tracing::warn!(deployment = %t.name, error = %e, "auto rollback update failed")
+            }
         }
     }
     tracing::info!(count = rolled, "auto rollback cycle done");

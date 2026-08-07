@@ -39,17 +39,18 @@ pub async fn list_quotas(
     b.build_query_as::<QuotaRow>().fetch_all(pool).await
 }
 
-pub async fn upsert_quota(
-    pool: &MySqlPool,
-    cluster_id: &str,
-    namespace: &str,
-    cpu_request: &str,
-    memory_request: &str,
-    cpu_limit: &str,
-    memory_limit: &str,
-    replicas: i32,
-    description: &str,
-) -> sqlx::Result<u64> {
+pub struct QuotaArgs<'a> {
+    pub cluster_id: &'a str,
+    pub namespace: &'a str,
+    pub cpu_request: &'a str,
+    pub memory_request: &'a str,
+    pub cpu_limit: &'a str,
+    pub memory_limit: &'a str,
+    pub replicas: i32,
+    pub description: &'a str,
+}
+
+pub async fn upsert_quota(pool: &MySqlPool, args: QuotaArgs<'_>) -> sqlx::Result<u64> {
     let r = sqlx::query(
         "INSERT INTO resource_quota \
          (cluster_id, namespace, cpu_request, memory_request, cpu_limit, memory_limit, replicas, description) \
@@ -59,14 +60,14 @@ pub async fn upsert_quota(
          memory_limit = VALUES(memory_limit), replicas = VALUES(replicas), \
          description = VALUES(description), id = LAST_INSERT_ID(id)",
     )
-    .bind(cluster_id)
-    .bind(namespace)
-    .bind(cpu_request)
-    .bind(memory_request)
-    .bind(cpu_limit)
-    .bind(memory_limit)
-    .bind(replicas)
-    .bind(description)
+    .bind(args.cluster_id)
+    .bind(args.namespace)
+    .bind(args.cpu_request)
+    .bind(args.memory_request)
+    .bind(args.cpu_limit)
+    .bind(args.memory_limit)
+    .bind(args.replicas)
+    .bind(args.description)
     .execute(pool)
     .await?;
     Ok(r.last_insert_id())

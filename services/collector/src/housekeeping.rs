@@ -167,7 +167,7 @@ fn prune_backups(dir: &str, keep: usize) {
             Some((e.path(), mtime))
         })
         .collect();
-    files.sort_by(|a, b| b.1.cmp(&a.1));
+    files.sort_by_key(|(_, mtime)| std::cmp::Reverse(*mtime));
     for (path, _) in files.into_iter().skip(keep) {
         if let Err(e) = std::fs::remove_file(&path) {
             tracing::warn!("backup prune failed for {}: {e}", path.display());

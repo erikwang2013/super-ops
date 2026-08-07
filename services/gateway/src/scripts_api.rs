@@ -7,8 +7,8 @@ use axum::{
 use serde::Deserialize;
 
 use crate::model::script::{
-    create_run, create_script, delete_script, get_script, get_script_content, list_runs,
-    list_scripts, mark_run_status, validate_script_input, validate_timeout_s,
+    CreateScriptArgs, create_run, create_script, delete_script, get_script, get_script_content,
+    list_runs, list_scripts, mark_run_status, validate_script_input, validate_timeout_s,
 };
 use crate::model::tenant::Tenant;
 use crate::proxy::k8s_proxy::status_to_http;
@@ -67,24 +67,26 @@ pub async fn create_script_handler(
         )
             .into_response();
     }
-    if let Some(t) = req.timeout_s {
-        if let Err(msg) = validate_timeout_s(t) {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({ "error": msg })),
-            )
-                .into_response();
-        }
+    if let Some(t) = req.timeout_s
+        && let Err(msg) = validate_timeout_s(t)
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": msg })),
+        )
+            .into_response();
     }
     match create_script(
         &state.pool,
-        &tenant.0,
-        &req.name,
-        req.description.as_deref().unwrap_or(""),
-        &language,
-        &req.content,
-        req.timeout_s.unwrap_or(300),
-        "",
+        CreateScriptArgs {
+            tenant: &tenant.0,
+            name: &req.name,
+            description: req.description.as_deref().unwrap_or(""),
+            language: &language,
+            content: &req.content,
+            timeout_s: req.timeout_s.unwrap_or(300),
+            created_by: "",
+        },
     )
     .await
     {

@@ -20,7 +20,7 @@ pub fn frame_valid(frame: &[u8]) -> bool {
     !frame.is_empty() && frame.len() <= 256 * 1024
 }
 
-pub fn truncate<'a>(frame: &'a [u8]) -> &'a [u8] {
+pub fn truncate(frame: &[u8]) -> &[u8] {
     &frame[..frame.len().min(256 * 1024)]
 }
 
@@ -66,7 +66,7 @@ pub fn record_frame(ch: &Arc<ClickhouseClient>, session_id: &str, node: &str, fr
         .ok()
     else {
         let dropped = DROPPED_FRAMES.fetch_add(1, Ordering::Relaxed) + 1;
-        if dropped % 100 == 0 {
+        if dropped.is_multiple_of(100) {
             tracing::warn!(dropped, "recording frames dropped: ClickHouse busy");
         }
         return;

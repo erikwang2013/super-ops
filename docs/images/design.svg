@@ -24,10 +24,11 @@
   <rect x="60" y="170" width="980" height="30" rx="8" fill="#0f172a"/>
   <rect x="60" y="185" width="980" height="15" fill="#0f172a"/>
   <text x="80" y="190" font-weight="bold" fill="#ffffff">接入层 · Gateway :8080（HTTP / WS）+ :9090（gRPC）</text>
-  <rect x="80" y="210" width="120" height="64" rx="6" fill="#fef2f2" stroke="#dc2626" stroke-width="1.2"/>
+  <rect x="80" y="210" width="120" height="80" rx="6" fill="#fef2f2" stroke="#dc2626" stroke-width="1.2"/>
   <text x="140" y="230" text-anchor="middle" fill="#b91c1c">WAF 扫描</text>
   <text x="140" y="248" text-anchor="middle" fill="#94a3b8">ecat-security</text>
-  <text x="140" y="264" text-anchor="middle" fill="#94a3b8">High/Critical → 403</text>
+  <text x="140" y="264" text-anchor="middle" fill="#94a3b8">High/Critical</text>
+  <text x="140" y="280" text-anchor="middle" fill="#94a3b8">→ 403</text>
   <rect x="217" y="210" width="120" height="64" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.2"/>
   <text x="277" y="230" text-anchor="middle" fill="#334155">认证三通道</text>
   <text x="277" y="248" text-anchor="middle" fill="#94a3b8">JWT / OAuth2</text>
@@ -114,14 +115,16 @@
   <rect x="230" y="680" width="150" height="56" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
   <text x="305" y="704" text-anchor="middle" font-weight="bold" fill="#334155">Jaeger :16686</text>
   <text x="305" y="722" text-anchor="middle" fill="#64748b">OTLP span / 追踪</text>
-  <rect x="400" y="680" width="640" height="56" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+  <rect x="400" y="680" width="640" height="76" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
   <text x="420" y="702" font-weight="bold" fill="#1e40af">可观测</text>
-  <text x="420" y="720" fill="#334155">Prometheus 抓取 gateway :8080/metrics；Jaeger 收集 gateway / k8s 的 OTLP span —— 数据流详见「架构总览」</text>
+  <text x="420" y="720" fill="#334155">Prometheus 抓取 gateway :8080/metrics；Jaeger 收集 gateway / k8s 的</text>
+  <text x="420" y="738" fill="#334155">OTLP span —— 数据流详见「架构总览」</text>
   <path d="M 965 274 L 965 430 L 1070 430 L 1070 708 L 1040 708" stroke="#2563eb" stroke-width="1" stroke-dasharray="4 3" fill="none" marker-end="url(#arrow-blue)"/>
 
   <!-- 框架 -->
-  <rect x="60" y="770" width="980" height="70" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+  <rect x="60" y="770" width="980" height="88" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
   <text x="80" y="792" font-weight="bold" fill="#334155">e-cat 框架组件（贯穿各层）</text>
   <text x="80" y="814" fill="#64748b">ecat-auth · ecat-middleware · ecat-circuit-breaker · ecat-config-remote · ecat-registry-consul · ecat-mq-kafka</text>
-  <text x="80" y="832" fill="#64748b">ecat-scheduler · ecat-lock · ecat-data(-sqlx / -clickhouse / -redis) · ecat-tracing-otlp · ecat-openapi · ecat-security · ecat-tls</text>
+  <text x="80" y="832" fill="#64748b">ecat-scheduler · ecat-lock · ecat-data(-sqlx / -clickhouse / -redis)</text>
+  <text x="80" y="850" fill="#64748b">ecat-tracing-otlp · ecat-openapi · ecat-security · ecat-tls</text>
 </svg>

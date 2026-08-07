@@ -71,27 +71,28 @@ pub async fn list_rules(pool: &MySqlPool) -> sqlx::Result<Vec<AlertRuleRow>> {
     .await
 }
 
-pub async fn create_rule(
-    pool: &MySqlPool,
-    name: &str,
-    metric: &str,
-    op: &str,
-    threshold: &str,
-    level: &str,
-    action: &str,
-    enabled: bool,
-) -> sqlx::Result<u64> {
+pub struct CreateRuleArgs<'a> {
+    pub name: &'a str,
+    pub metric: &'a str,
+    pub op: &'a str,
+    pub threshold: &'a str,
+    pub level: &'a str,
+    pub action: &'a str,
+    pub enabled: bool,
+}
+
+pub async fn create_rule(pool: &MySqlPool, args: CreateRuleArgs<'_>) -> sqlx::Result<u64> {
     let r = sqlx::query(
         "INSERT INTO alert_rule (name, metric, operator, threshold, level, action, enabled) \
          VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(name)
-    .bind(metric)
-    .bind(op)
-    .bind(threshold)
-    .bind(level)
-    .bind(action)
-    .bind(enabled)
+    .bind(args.name)
+    .bind(args.metric)
+    .bind(args.op)
+    .bind(args.threshold)
+    .bind(args.level)
+    .bind(args.action)
+    .bind(args.enabled)
     .execute(pool)
     .await?;
     Ok(r.last_insert_id())

@@ -508,35 +508,31 @@ impl K8sService for K8sServiceImpl {
         tokio::spawn(async move {
             let mut writer = stdin;
             let mut resize = resize;
-            if !first.stdin.is_empty() {
-                if let Some(w) = writer.as_mut() {
-                    if w.write_all(&first.stdin).await.is_err() {
-                        return;
-                    }
-                }
+            if !first.stdin.is_empty()
+                && let Some(w) = writer.as_mut()
+                && w.write_all(&first.stdin).await.is_err()
+            {
+                return;
             }
             while let Some(msg) = in_stream.next().await {
                 let Ok(msg) = msg else { break };
-                if let Some(ws) = resize.as_mut() {
-                    if let Some(ts) = msg.terminal_size {
-                        if ws
-                            .send(kube::api::TerminalSize {
-                                height: ts.height as u16,
-                                width: ts.width as u16,
-                            })
-                            .await
-                            .is_err()
-                        {
-                            return;
-                        }
-                    }
+                if let Some(ws) = resize.as_mut()
+                    && let Some(ts) = msg.terminal_size
+                    && ws
+                        .send(kube::api::TerminalSize {
+                            height: ts.height as u16,
+                            width: ts.width as u16,
+                        })
+                        .await
+                        .is_err()
+                {
+                    return;
                 }
-                if !msg.stdin.is_empty() {
-                    if let Some(w) = writer.as_mut() {
-                        if w.write_all(&msg.stdin).await.is_err() {
-                            return;
-                        }
-                    }
+                if !msg.stdin.is_empty()
+                    && let Some(w) = writer.as_mut()
+                    && w.write_all(&msg.stdin).await.is_err()
+                {
+                    return;
                 }
             }
         });

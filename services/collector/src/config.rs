@@ -278,19 +278,17 @@ pub struct Config {
 pub fn collector_config_from(path: &str) -> anyhow::Result<Config> {
     let raw = std::fs::read_to_string(path)?;
     let mut cfg: Config = serde_yaml::from_str(&raw)?;
-    if let Some(mysql) = &mut cfg.mysql {
-        if let Ok(secret) = std::env::var("SUPEROPS_MYSQL_PASSWORD") {
-            if !secret.is_empty() {
-                mysql.password = secret;
-            }
-        }
+    if let Some(mysql) = &mut cfg.mysql
+        && let Ok(secret) = std::env::var("SUPEROPS_MYSQL_PASSWORD")
+        && !secret.is_empty()
+    {
+        mysql.password = secret;
     }
-    if let Some(smtp) = &mut cfg.smtp {
-        if let Ok(secret) = std::env::var("SUPEROPS_SMTP_PASSWORD") {
-            if !secret.is_empty() {
-                smtp.password = secret;
-            }
-        }
+    if let Some(smtp) = &mut cfg.smtp
+        && let Ok(secret) = std::env::var("SUPEROPS_SMTP_PASSWORD")
+        && !secret.is_empty()
+    {
+        smtp.password = secret;
     }
     Ok(cfg)
 }

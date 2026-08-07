@@ -118,10 +118,10 @@ impl Config {
         let path = std::env::var("GATEWAY_CONFIG").unwrap_or_else(|_| "config/gateway.yaml".into());
         let content = std::fs::read_to_string(path)?;
         let mut config: Config = serde_yaml::from_str(&content)?;
-        if let Ok(secret) = std::env::var("SUPEROPS_JWT_SECRET") {
-            if !secret.is_empty() {
-                config.auth.jwt_secret = secret;
-            }
+        if let Ok(secret) = std::env::var("SUPEROPS_JWT_SECRET")
+            && !secret.is_empty()
+        {
+            config.auth.jwt_secret = secret;
         }
         if config.auth.jwt_secret == "change-me-in-production-0123456789abcdef" {
             tracing::warn!(

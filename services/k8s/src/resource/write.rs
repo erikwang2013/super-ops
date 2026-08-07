@@ -14,26 +14,6 @@ pub fn validate_scale(cluster_id: &str, namespace: &str, name: &str, replicas: i
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn validate_scale_rejects_empty_fields() {
-        assert!(validate_scale("", "ns", "name", 2).is_err());
-        assert!(validate_scale("c", "", "name", 2).is_err());
-        assert!(validate_scale("c", "ns", "", 2).is_err());
-    }
-
-    #[test]
-    fn validate_scale_rejects_out_of_range_replicas() {
-        assert!(validate_scale("c", "ns", "name", -1).is_err());
-        assert!(validate_scale("c", "ns", "name", 1001).is_err());
-        assert!(validate_scale("c", "ns", "name", 0).is_ok());
-        assert!(validate_scale("c", "ns", "name", 1000).is_ok());
-    }
-}
-
 use k8s_openapi::api::apps::v1::Deployment;
 use kube::api::{Api, DeleteParams, Patch, PatchParams, PostParams};
 
@@ -113,4 +93,24 @@ pub async fn update_deployment_image(
     }));
     api.patch(name, &PatchParams::default(), &patch).await?;
     Ok(image.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_scale_rejects_empty_fields() {
+        assert!(validate_scale("", "ns", "name", 2).is_err());
+        assert!(validate_scale("c", "", "name", 2).is_err());
+        assert!(validate_scale("c", "ns", "", 2).is_err());
+    }
+
+    #[test]
+    fn validate_scale_rejects_out_of_range_replicas() {
+        assert!(validate_scale("c", "ns", "name", -1).is_err());
+        assert!(validate_scale("c", "ns", "name", 1001).is_err());
+        assert!(validate_scale("c", "ns", "name", 0).is_ok());
+        assert!(validate_scale("c", "ns", "name", 1000).is_ok());
+    }
 }

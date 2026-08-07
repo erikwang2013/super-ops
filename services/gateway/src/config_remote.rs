@@ -52,8 +52,7 @@ pub async fn list_config_keys(
                 let key = e["Key"].as_str().unwrap_or_default();
                 let value = e["Value"]
                     .as_str()
-                    .map(|v| base64::engine::general_purpose::STANDARD.decode(v).ok())
-                    .flatten()
+                    .and_then(|v| base64::engine::general_purpose::STANDARD.decode(v).ok())
                     .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
                     .unwrap_or_default();
                 serde_json::json!({
@@ -198,17 +197,17 @@ pub fn apply_dynamic(
     cfg: &DynamicConfig,
 ) -> Vec<String> {
     let mut applied = Vec::new();
-    if let Some(v) = values.get("rate.limit.max") {
-        if let Some(max) = v.as_u64() {
-            *cfg.rate_limit_max.write().unwrap() = max as u32;
-            applied.push(format!("rate.limit.max={max}"));
-        }
+    if let Some(v) = values.get("rate.limit.max")
+        && let Some(max) = v.as_u64()
+    {
+        *cfg.rate_limit_max.write().unwrap() = max as u32;
+        applied.push(format!("rate.limit.max={max}"));
     }
-    if let Some(v) = values.get("rate.limit.window") {
-        if let Some(secs) = v.as_u64() {
-            *cfg.rate_limit_window_secs.write().unwrap() = secs;
-            applied.push(format!("rate.limit.window={secs}"));
-        }
+    if let Some(v) = values.get("rate.limit.window")
+        && let Some(secs) = v.as_u64()
+    {
+        *cfg.rate_limit_window_secs.write().unwrap() = secs;
+        applied.push(format!("rate.limit.window={secs}"));
     }
     applied
 }

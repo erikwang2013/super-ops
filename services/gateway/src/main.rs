@@ -1,13 +1,12 @@
 mod alert_rules_api;
 mod alerts_api;
-mod chaos_api;
-mod quota_api;
 mod approval_api;
 mod audit_api;
 mod auth;
 mod backup_api;
 mod breaker;
 mod capacity_api;
+mod chaos_api;
 mod cmdb_api;
 mod config;
 mod config_remote;
@@ -20,6 +19,7 @@ mod model;
 mod oncall_api;
 mod openapi;
 mod proxy;
+mod quota_api;
 mod recorder;
 #[cfg(test)]
 mod recorder_test;
@@ -134,7 +134,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let master_key = std::env::var("SUPEROPS_MASTER_KEY")
         .ok()
-        .and_then(|k| (k.as_bytes().len() == 32).then(|| k.into_bytes()));
+        .and_then(|k| (k.len() == 32).then(|| k.into_bytes()));
     if master_key.is_none() {
         tracing::warn!("SUPEROPS_MASTER_KEY 未设置或非 32 字节，/api/secrets 将返回 503");
     }

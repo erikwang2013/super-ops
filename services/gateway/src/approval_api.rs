@@ -35,16 +35,16 @@ pub async fn list_approvals_handler(
     State(state): State<crate::AppState>,
     Query(q): Query<ListApprovalsQuery>,
 ) -> impl IntoResponse {
-    if let Some(s) = &q.status {
-        if !APPROVAL_STATUSES.contains(&s.as_str()) {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({
-                    "error": format!("status must be one of {:?}", APPROVAL_STATUSES)
-                })),
-            )
-                .into_response();
-        }
+    if let Some(s) = &q.status
+        && !APPROVAL_STATUSES.contains(&s.as_str())
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("status must be one of {:?}", APPROVAL_STATUSES)
+            })),
+        )
+            .into_response();
     }
     let limit = q.limit.unwrap_or(50).clamp(1, 500);
     match list_approvals(&state.pool, q.status.as_deref(), limit).await {

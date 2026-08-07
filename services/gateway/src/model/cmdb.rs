@@ -47,28 +47,29 @@ pub async fn list_assets(
     b.build_query_as::<AssetRow>().fetch_all(pool).await
 }
 
-pub async fn upsert_asset(
-    pool: &MySqlPool,
-    tenant: &str,
-    asset_type: &str,
-    name: &str,
-    ip: Option<&str>,
-    env: &str,
-    owner: &str,
-    labels: Option<&str>,
-) -> sqlx::Result<u64> {
+pub struct AssetArgs<'a> {
+    pub tenant: &'a str,
+    pub asset_type: &'a str,
+    pub name: &'a str,
+    pub ip: Option<&'a str>,
+    pub env: &'a str,
+    pub owner: &'a str,
+    pub labels: Option<&'a str>,
+}
+
+pub async fn upsert_asset(pool: &MySqlPool, args: AssetArgs<'_>) -> sqlx::Result<u64> {
     let r = sqlx::query(
         "INSERT INTO cmdb_asset (tenant_id, asset_type, name, ip, env, owner, labels) \
          VALUES (?, ?, ?, ?, ?, ?, ?) \
          ON DUPLICATE KEY UPDATE ip = VALUES(ip), env = VALUES(env), owner = VALUES(owner), labels = VALUES(labels), id = LAST_INSERT_ID(id)",
     )
-    .bind(tenant)
-    .bind(asset_type)
-    .bind(name)
-    .bind(ip)
-    .bind(env)
-    .bind(owner)
-    .bind(labels)
+    .bind(args.tenant)
+    .bind(args.asset_type)
+    .bind(args.name)
+    .bind(args.ip)
+    .bind(args.env)
+    .bind(args.owner)
+    .bind(args.labels)
     .execute(pool)
     .await?;
     Ok(r.last_insert_id())

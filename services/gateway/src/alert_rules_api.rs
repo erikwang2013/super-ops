@@ -7,7 +7,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::model::alert_rule::{
-    create_rule, delete_rule, list_rules, set_rule_enabled, validate_rule,
+    CreateRuleArgs, create_rule, delete_rule, list_rules, set_rule_enabled, validate_rule,
 };
 
 #[derive(Debug, Deserialize)]
@@ -78,13 +78,15 @@ pub async fn create_alert_rule(
     }
     match create_rule(
         &state.pool,
-        &req.name,
-        &req.metric,
-        &req.operator,
-        &req.threshold,
-        &req.level,
-        &req.action,
-        req.enabled,
+        CreateRuleArgs {
+            name: &req.name,
+            metric: &req.metric,
+            op: &req.operator,
+            threshold: &req.threshold,
+            level: &req.level,
+            action: &req.action,
+            enabled: req.enabled,
+        },
     )
     .await
     {

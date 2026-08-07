@@ -106,7 +106,7 @@ async fn list_clusters(State(state): State<crate::AppState>) -> ApiResult<serde_
     let clusters = client
         .list_clusters(superops_protos::k8s::v1::ListClustersRequest::default())
         .await
-        .map_err(|e| status_to_http(e))?
+        .map_err(status_to_http)?
         .into_inner()
         .clusters;
     let clusters: Vec<serde_json::Value> = clusters
@@ -139,7 +139,7 @@ async fn add_cluster(
     let c = client
         .add_cluster(superops_protos::k8s::v1::AddClusterRequest { name, kubeconfig })
         .await
-        .map_err(|e| status_to_http(e))?
+        .map_err(status_to_http)?
         .into_inner()
         .cluster
         .ok_or_else(|| {
@@ -162,7 +162,7 @@ async fn get_cluster(
             cluster_id: cluster_id.clone(),
         })
         .await
-        .map_err(|e| status_to_http(e))?
+        .map_err(status_to_http)?
         .into_inner()
         .cluster
         .ok_or_else(|| {
@@ -184,7 +184,7 @@ async fn remove_cluster(
     client
         .remove_cluster(superops_protos::k8s::v1::RemoveClusterRequest { cluster_id })
         .await
-        .map_err(|e| status_to_http(e))?;
+        .map_err(status_to_http)?;
     Ok(StatusCode::NO_CONTENT)
 }
 async fn list_pods(
@@ -200,7 +200,7 @@ async fn list_pods(
             ..Default::default()
         })
         .await
-        .map_err(|e| status_to_http(e))?
+        .map_err(status_to_http)?
         .into_inner()
         .pods;
     let pods: Vec<serde_json::Value> = pods
@@ -229,7 +229,7 @@ async fn get_pod_logs(
             follow: false,
         })
         .await
-        .map_err(|e| status_to_http(e))?
+        .map_err(status_to_http)?
         .into_inner();
     let mut lines = Vec::new();
     while let Some(line) = stream.next().await {
@@ -258,7 +258,7 @@ async fn list_deployments(
             namespace: String::new(),
         })
         .await
-        .map_err(|e| status_to_http(e))?
+        .map_err(status_to_http)?
         .into_inner()
         .deployments;
     let deps: Vec<serde_json::Value> = deps
@@ -283,7 +283,7 @@ pub async fn aggregate_clusters(
     let clusters = client
         .list_clusters(superops_protos::k8s::v1::ListClustersRequest::default())
         .await
-        .map_err(|e| status_to_http(e))?
+        .map_err(status_to_http)?
         .into_inner()
         .clusters;
     let mut items = Vec::new();
@@ -340,7 +340,7 @@ async fn list_nodes(
             cluster_id: cid.clone(),
         })
         .await
-        .map_err(|e| status_to_http(e))?
+        .map_err(status_to_http)?
         .into_inner()
         .nodes;
     let nodes: Vec<serde_json::Value> = nodes

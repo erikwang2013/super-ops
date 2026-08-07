@@ -27,21 +27,21 @@ fn escape_like(s: &str) -> String {
 
 fn build_where(q: &LogSearchQuery) -> Vec<String> {
     let mut w = Vec::new();
-    if let Some(ns) = &q.namespace {
-        if !ns.is_empty() {
-            w.push(format!("namespace = '{}'", escape_like(ns)));
-        }
+    if let Some(ns) = &q.namespace
+        && !ns.is_empty()
+    {
+        w.push(format!("namespace = '{}'", escape_like(ns)));
     }
-    if let Some(p) = &q.pod {
-        if !p.is_empty() {
-            w.push(format!("pod = '{}'", escape_like(p)));
-        }
+    if let Some(p) = &q.pod
+        && !p.is_empty()
+    {
+        w.push(format!("pod = '{}'", escape_like(p)));
     }
-    if let Some(k) = &q.keyword {
-        if !k.is_empty() {
-            let k = k.replace('%', "");
-            w.push(format!("content ILIKE '%{}%'", escape_like(&k)));
-        }
+    if let Some(k) = &q.keyword
+        && !k.is_empty()
+    {
+        let k = k.replace('%', "");
+        w.push(format!("content ILIKE '%{}%'", escape_like(&k)));
     }
     if let Some(f) = q.from {
         w.push(format!("timestamp >= {f}"));

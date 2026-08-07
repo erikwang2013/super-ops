@@ -19,7 +19,7 @@ fn truncate_caps_at_256k() {
         crate::recorder::truncate(&vec![0u8; 256 * 1024 + 1]).len(),
         256 * 1024
     );
-    assert_eq!(crate::recorder::truncate(&vec![0u8; 8]).len(), 8);
+    assert_eq!(crate::recorder::truncate(&[0u8; 8]).len(), 8);
 }
 
 #[test]

@@ -1,11 +1,11 @@
 pub mod alert_rule;
 pub mod api_key;
 pub mod approval;
-pub mod chaos;
 pub mod backup;
+pub mod chaos;
 pub mod cmdb;
-pub mod quota;
 pub mod oncall;
+pub mod quota;
 pub mod release;
 pub mod runbook;
 pub mod script;

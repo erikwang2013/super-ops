@@ -80,27 +80,28 @@ pub async fn get_script(
     .await
 }
 
-pub async fn create_script(
-    pool: &MySqlPool,
-    tenant: &str,
-    name: &str,
-    description: &str,
-    language: &str,
-    content: &str,
-    timeout_s: i32,
-    created_by: &str,
-) -> sqlx::Result<i64> {
+pub struct CreateScriptArgs<'a> {
+    pub tenant: &'a str,
+    pub name: &'a str,
+    pub description: &'a str,
+    pub language: &'a str,
+    pub content: &'a str,
+    pub timeout_s: i32,
+    pub created_by: &'a str,
+}
+
+pub async fn create_script(pool: &MySqlPool, args: CreateScriptArgs<'_>) -> sqlx::Result<i64> {
     let r = sqlx::query(
         "INSERT INTO script (tenant_id, name, description, language, content, timeout_s, created_by) \
          VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(tenant)
-    .bind(name)
-    .bind(description)
-    .bind(language)
-    .bind(content)
-    .bind(timeout_s)
-    .bind(created_by)
+    .bind(args.tenant)
+    .bind(args.name)
+    .bind(args.description)
+    .bind(args.language)
+    .bind(args.content)
+    .bind(args.timeout_s)
+    .bind(args.created_by)
     .execute(pool)
     .await?;
     Ok(r.last_insert_id() as i64)

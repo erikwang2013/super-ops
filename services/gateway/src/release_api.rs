@@ -7,7 +7,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::model::release::{
-    get_release, list_releases, record_release, validate_release,
+    ReleaseArgs, get_release, list_releases, record_release, validate_release,
 };
 
 #[derive(Debug, Deserialize)]
@@ -103,13 +103,15 @@ pub async fn create_release_handler(
     };
     let inserted = record_release(
         &state.pool,
-        &req.cluster_id,
-        &req.namespace,
-        &req.name,
-        old_image,
-        &image,
-        &req.operator,
-        status,
+        ReleaseArgs {
+            cluster_id: &req.cluster_id,
+            namespace: &req.namespace,
+            name: &req.name,
+            old_image,
+            new_image: &image,
+            operator: &req.operator,
+            status,
+        },
     )
     .await;
     if let Some(e) = err_msg {
@@ -192,13 +194,15 @@ pub async fn rollback_release_handler(
     };
     let inserted = record_release(
         &state.pool,
-        &rel.cluster_id,
-        &rel.namespace,
-        &rel.name,
-        &rel.new_image,
-        &rel.old_image,
-        operator,
-        status,
+        ReleaseArgs {
+            cluster_id: &rel.cluster_id,
+            namespace: &rel.namespace,
+            name: &rel.name,
+            old_image: &rel.new_image,
+            new_image: &rel.old_image,
+            operator,
+            status,
+        },
     )
     .await;
     if let Some(e) = err_msg {

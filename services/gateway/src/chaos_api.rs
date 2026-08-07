@@ -175,7 +175,11 @@ pub async fn run_chaos_handler(
             .into_response();
     }
     if status == "completed" {
-        (StatusCode::OK, Json(serde_json::json!({ "status": status }))).into_response()
+        (
+            StatusCode::OK,
+            Json(serde_json::json!({ "status": status })),
+        )
+            .into_response()
     } else {
         (
             StatusCode::BAD_GATEWAY,

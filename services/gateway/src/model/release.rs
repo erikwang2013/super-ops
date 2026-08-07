@@ -31,27 +31,28 @@ pub fn validate_release(image: &str, status: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub async fn record_release(
-    pool: &MySqlPool,
-    cluster_id: &str,
-    namespace: &str,
-    name: &str,
-    old_image: &str,
-    new_image: &str,
-    operator: &str,
-    status: &str,
-) -> sqlx::Result<i64> {
+pub struct ReleaseArgs<'a> {
+    pub cluster_id: &'a str,
+    pub namespace: &'a str,
+    pub name: &'a str,
+    pub old_image: &'a str,
+    pub new_image: &'a str,
+    pub operator: &'a str,
+    pub status: &'a str,
+}
+
+pub async fn record_release(pool: &MySqlPool, args: ReleaseArgs<'_>) -> sqlx::Result<i64> {
     let r = sqlx::query(
         "INSERT INTO release (cluster_id, namespace, name, old_image, new_image, operator, status) \
          VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(cluster_id)
-    .bind(namespace)
-    .bind(name)
-    .bind(old_image)
-    .bind(new_image)
-    .bind(operator)
-    .bind(status)
+    .bind(args.cluster_id)
+    .bind(args.namespace)
+    .bind(args.name)
+    .bind(args.old_image)
+    .bind(args.new_image)
+    .bind(args.operator)
+    .bind(args.status)
     .execute(pool)
     .await?;
     Ok(r.last_insert_id() as i64)
