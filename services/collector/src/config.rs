@@ -61,6 +61,21 @@ fn default_silence() -> u64 {
     300
 }
 
+// B4 邮件通知通道：notify targets kind=email 时经此 SMTP 发送
+#[derive(Debug, Clone, Deserialize)]
+pub struct SmtpConfig {
+    pub host: String,
+    #[serde(default = "default_smtp_port")]
+    pub port: u16,
+    pub username: String,
+    pub password: String,
+    pub from: String,
+}
+
+fn default_smtp_port() -> u16 {
+    587
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct LogtailConfig {
     #[serde(default)]
@@ -97,6 +112,34 @@ fn default_max_line() -> i32 {
 
 fn default_logtail_interval() -> u64 {
     30
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SelfhealConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_selfheal_cluster")]
+    pub cluster_id: String,
+    #[serde(default = "default_selfheal_max")]
+    pub max_actions_per_cycle: usize,
+}
+
+impl Default for SelfhealConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            cluster_id: default_selfheal_cluster(),
+            max_actions_per_cycle: default_selfheal_max(),
+        }
+    }
+}
+
+fn default_selfheal_cluster() -> String {
+    "default".into()
+}
+
+fn default_selfheal_max() -> usize {
+    5
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -163,7 +206,11 @@ pub struct Config {
     #[serde(default)]
     pub housekeeping: HousekeepingConfig,
     #[serde(default)]
+    pub selfheal: SelfhealConfig,
+    #[serde(default)]
     pub mysql: Option<MysqlConfig>,
+    #[serde(default)]
+    pub smtp: Option<SmtpConfig>,
 }
 
 pub fn collector_config_from(path: &str) -> anyhow::Result<Config> {
@@ -173,6 +220,13 @@ pub fn collector_config_from(path: &str) -> anyhow::Result<Config> {
         if let Ok(secret) = std::env::var("SUPEROPS_MYSQL_PASSWORD") {
             if !secret.is_empty() {
                 mysql.password = secret;
+            }
+        }
+    }
+    if let Some(smtp) = &mut cfg.smtp {
+        if let Ok(secret) = std::env::var("SUPEROPS_SMTP_PASSWORD") {
+            if !secret.is_empty() {
+                smtp.password = secret;
             }
         }
     }

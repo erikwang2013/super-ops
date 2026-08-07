@@ -22,7 +22,19 @@ otlp: "http://localhost:4317"
 
 notify:
   silence_secs: 300
+  # B4: 通知通道 —— webhook(generic/dingtalk/wecom) 或邮件(email，收件人写在 url，逗号分隔多个)
   targets: []
+  # - name: mail-ops
+  #   kind: email
+  #   url: "ops@example.com,oncall@example.com"
+
+# B4: SMTP 配置（kind=email 的 notify target 需要；密码可用 SUPEROPS_SMTP_PASSWORD 覆盖）
+# smtp:
+#   host: smtp.example.com
+#   port: 587
+#   username: superops
+#   password: change-me
+#   from: superops@example.com
 
 logtail:
   enabled: false
@@ -35,6 +47,12 @@ logtail:
 housekeeping:
   enabled: true
   interval_secs: 86400
+
+# P6-5: 自愈动作（规则 action=restart/scale 时执行；默认关闭，需显式开启）
+selfheal:
+  enabled: false
+  cluster_id: "default"
+  max_actions_per_cycle: 5
 
 mysql:
   host: "localhost"

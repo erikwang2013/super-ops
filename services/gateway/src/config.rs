@@ -23,6 +23,24 @@ pub struct Config {
     pub approval: ApprovalConfig,
     #[serde(default)]
     pub recording: RecordingConfig,
+    #[serde(default)]
+    pub terminal: TerminalConfig,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct TerminalConfig {
+    /// 终端会话管控：require_confirm 时 ws 升级需带 confirm=1；max_session_secs 为会话时长上限
+    pub require_confirm: bool,
+    pub max_session_secs: u64,
+}
+
+impl Default for TerminalConfig {
+    fn default() -> Self {
+        Self {
+            require_confirm: true,
+            max_session_secs: 1800,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, Default)]
@@ -145,5 +163,19 @@ mod tests {
             serde_yaml::from_str(&format!("{}recording:\n  enabled: false\n", base_yaml()))
                 .unwrap();
         assert!(!cfg.recording.enabled);
+    }
+
+    #[test]
+    fn terminal_defaults_require_confirm_and_30min() {
+        let cfg: Config = serde_yaml::from_str(base_yaml()).unwrap();
+        assert!(cfg.terminal.require_confirm);
+        assert_eq!(cfg.terminal.max_session_secs, 1800);
+        let cfg: Config = serde_yaml::from_str(&format!(
+            "{}terminal:\n  require_confirm: false\n  max_session_secs: 600\n",
+            base_yaml()
+        ))
+        .unwrap();
+        assert!(!cfg.terminal.require_confirm);
+        assert_eq!(cfg.terminal.max_session_secs, 600);
     }
 }

@@ -214,6 +214,30 @@ impl K8sService for K8sServiceImpl {
         ))
     }
 
+    async fn update_deployment_image(
+        &self,
+        request: Request<superops_protos::k8s::v1::UpdateDeploymentImageRequest>,
+    ) -> GrpcResult<superops_protos::k8s::v1::UpdateDeploymentImageResponse> {
+        let req = request.into_inner();
+        resource::write::validate_image(&req.cluster_id, &req.namespace, &req.name, &req.image)
+            .map_err(|e| Status::invalid_argument(e.to_string()))?;
+        let client = self
+            .manager
+            .get(&req.cluster_id)
+            .map_err(|e| Status::not_found(e.to_string()))?;
+        let image = resource::write::update_deployment_image(
+            &client,
+            &req.namespace,
+            &req.name,
+            &req.image,
+        )
+        .await
+        .map_err(|e| Status::internal(e.to_string()))?;
+        Ok(Response::new(
+            superops_protos::k8s::v1::UpdateDeploymentImageResponse { image },
+        ))
+    }
+
     async fn run_job(&self, request: Request<RunJobRequest>) -> GrpcResult<RunJobResponse> {
         let req = request.into_inner();
         resource::job::validate_job(

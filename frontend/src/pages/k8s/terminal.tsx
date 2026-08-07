@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Card, Form, Input, Button, Space } from 'antd';
+import { Card, Form, Input, Button, Space, Modal } from 'antd';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
@@ -21,7 +21,7 @@ export default function TerminalPage() {
     };
   }, []);
 
-  const connect = (v: { cluster: string; namespace: string; pod: string; container?: string }) => {
+  const doConnect = (v: { cluster: string; namespace: string; pod: string; container?: string }) => {
     wsRef.current?.close();
     termRef.current?.dispose();
 
@@ -35,7 +35,8 @@ export default function TerminalPage() {
     const token = useAuthStore.getState().token;
     const container = v.container ? `&container=${encodeURIComponent(v.container)}` : '';
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${proto}//${location.host}/api/k8s/clusters/${v.cluster}/pods/${v.namespace}/${v.pod}/exec?token=${encodeURIComponent(token || '')}${container}`);
+    // B3 会话管控：连接前用户已确认，携带 confirm=1（gateway 校验，缺失则 400）
+    const ws = new WebSocket(`${proto}//${location.host}/api/k8s/clusters/${v.cluster}/pods/${v.namespace}/${v.pod}/exec?token=${encodeURIComponent(token || '')}${container}&confirm=1`);
     // xterm 接收二进制更快且不受 utf-8 拆分影响
     ws.binaryType = 'arraybuffer';
     wsRef.current = ws;
@@ -57,6 +58,16 @@ export default function TerminalPage() {
     };
     term.onData((d) => { if (ws.readyState === WebSocket.OPEN) ws.send(d); });
     window.addEventListener('resize', onResize);
+  };
+
+  const connect = (v: { cluster: string; namespace: string; pod: string; container?: string }) => {
+    Modal.confirm({
+      title: '终端会话安全确认',
+      content: `将建立到 ${v.cluster}/${v.namespace}/${v.pod} 的交互式终端会话（最长 30 分钟，全程录制）。是否继续？`,
+      okText: '连接',
+      cancelText: '取消',
+      onOk: () => doConnect(v),
+    });
   };
 
   return (

@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.6.0] — 2026-08-07 — 生态缺口闭环（B 类修复 + C 类缺失域 + D 类扩展）
+
+### Added
+- **B1 告警规则引擎**：MySQL `alert_rule` 表 + `/api/alert-rules` CRUD（ops:cmdb）；collector 按规则求值（连续 N 次超标触发，`max_not_ready` 节点数限制）；前端 `/ops/alert-rules` 规则页（CRUD + 启用开关）
+- **B2 追踪 UI**：前端 `/ops/traces` 链路追踪页（Jaeger UI iframe 嵌入，16686）
+- **B3 终端安全管控**：exec WS 需 `?confirm=1`（`terminal.require_confirm` 默认开，缺失 400）；`terminal.max_session_secs` 超时强制断开（默认 1800s）；前端会话前 Modal.confirm
+- **B4 通知通道扩展**：collector notify 支持 SMTP 邮件（`kind=email`，收件人逗号分隔多个，`SUPEROPS_SMTP_PASSWORD` 覆盖密码；smtp 段未配置时该 target 明确报错）；`email_body`/`send_email` + 2 新测试
+- **C1 工单系统**：`ticket` 表 + `/api/tickets` CRUD/状态流转（open→in_progress→resolved/closed + reopen）；前端 `/ops/tickets` 页；告警中心一键建单
+- **C2 Runbook 剧本**：`runbook` 表（steps JSON）+ `/api/runbooks` CRUD + `/run` 顺序执行（逐步结果）；前端 `/ops/runbooks` 页
+- **C3 值班排班**：oncall 表 + `/api/oncall` CRUD；前端 `/ops/oncall` 页
+- **C4 发布流水线**：k8s-service gRPC `UpdateImage`（deployment 镜像更新）+ `release` 表 + `/api/releases`；前端 `/ops/releases` 页
+- **C5 DB 运维**：备份状态上报 API（`POST /api/backups/status`，agent 经 API key）+ 汇总（`/api/backups/summary`，时效统计）；前端 `/ops/backups` 页
+- **C6 自愈动作**：规则 `action=restart/scale` 时 collector 执行 k8s restart/scale（`selfheal.enabled` 默认关闭、`max_actions_per_cycle` 限制）；动作入审计
+- **C7 容量/成本**：`/api/capacity/summary|trend`（ClickHouse 汇聚）；前端 `/ops/capacity` 趋势页（手写 SVG）
+- **D1 跨集群聚合**：`/api/k8s/aggregate`（全集群节点/Pod 健康汇总 + totals）；总览页「集群健康」卡片真实数据（每集群 Ready/Running 计数）；gateway 集群管理 7 个 stub handler 全部改为真实 gRPC 转发（list_clusters/add/get/remove、list_pods、get_pod_logs 流式、list_deployments）；修复 `list_nodes` 丢失 cluster_id 的 bug
+- **D3 配置管理 UI**：`/api/config/remote/keys[/{key}]`（Consul KV CRUD，`config/superops` 前缀校验 400、Consul 不可达 502，ops:cmdb）；前端 `/ops/config` 配置中心页（ProTable + 编辑 Modal + 删除确认）
+- 前端 API 层：`api.put` 方法 + `configRemoteApi`；`k8sApi.aggregate`；`AggregateCluster`/`AggregateTotals` 类型
+
+### Changed
+- 运维中心菜单新增 9 项：告警规则 / 链路追踪 / 工单系统 / Runbook 剧本 / 值班排班 / 发布流水线 / DB 备份状态 / 容量成本 / 配置中心
+- Gateway 功能表、API 一览、已知边界、Collector/Frontend 段同步更新；新增 `docs/multicloud.md` 多云接入指南
+
+### Fixed
+- gateway `list_nodes` 未传 `cluster_id` 导致跨集群节点查询恒查默认集群
+- gateway k8s 集群管理此前全部为 stub（新增/删除/详情返回假数据）
+
+### Verified
+- workspace 391 项测试全过（0 失败，含 config_remote 新增 `kv_validate_key_requires_prefix`、collector notify email 2 项）；`cargo fmt --check` / `cargo check --workspace` / `npm run build` 全绿
+
 ## [1.5.2] — 2026-08-07 — 前端功能补齐（生态缺口 A 类 + 多集群）
 
 ### Added

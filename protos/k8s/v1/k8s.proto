@@ -21,6 +21,7 @@ service K8sService {
   rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse);
   rpc ScaleDeployment(ScaleDeploymentRequest) returns (ScaleDeploymentResponse);
   rpc RestartDeployment(RestartDeploymentRequest) returns (RestartDeploymentResponse);
+  rpc UpdateDeploymentImage(UpdateDeploymentImageRequest) returns (UpdateDeploymentImageResponse);
   rpc DeleteDeployment(DeleteDeploymentRequest) returns (DeleteDeploymentResponse);
   rpc RunJob(RunJobRequest) returns (RunJobResponse);
 }
@@ -179,6 +180,14 @@ message RestartDeploymentRequest {
   string name = 3;
 }
 message RestartDeploymentResponse { bool restarted = 1; }
+
+message UpdateDeploymentImageRequest {
+  string cluster_id = 1;
+  string namespace = 2;
+  string name = 3;
+  string image = 4;
+}
+message UpdateDeploymentImageResponse { string image = 1; }
 
 message DeleteDeploymentRequest {
   string cluster_id = 1;

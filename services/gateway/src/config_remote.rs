@@ -1,7 +1,183 @@
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::StatusCode,
+};
+use base64::Engine;
 use ecat_config::ConfigError;
 use ecat_middleware::RateLimitStore;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+
+/// Consul KV 管理 API（D3 配置中心）：读写 config/superops 前缀下的键。
+const KV_PREFIX: &str = "config/superops";
+
+fn validate_key(key: &str) -> Result<(), String> {
+    if !key.starts_with(KV_PREFIX) {
+        return Err(format!("key must start with '{KV_PREFIX}/'"));
+    }
+    if key.len() <= KV_PREFIX.len() + 1 {
+        return Err("key must include a name after the prefix".into());
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+pub struct PutConfigKey {
+    pub value: String,
+}
+
+pub async fn list_config_keys(
+    State(state): State<crate::AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let Some(addr) = &state.consul else {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "consul not configured"})),
+        ));
+    };
+    let url = format!("{addr}/v1/kv/{KV_PREFIX}?recurse=true");
+    let resp = reqwest::get(&url)
+        .await
+        .map_err(|e| backend_error(&e.to_string()))?;
+    if resp.status().is_success() {
+        let raw: Vec<serde_json::Value> = resp
+            .json()
+            .await
+            .map_err(|e| backend_error(&e.to_string()))?;
+        let keys: Vec<serde_json::Value> = raw
+            .iter()
+            .map(|e| {
+                let key = e["Key"].as_str().unwrap_or_default();
+                let value = e["Value"]
+                    .as_str()
+                    .map(|v| base64::engine::general_purpose::STANDARD.decode(v).ok())
+                    .flatten()
+                    .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+                    .unwrap_or_default();
+                serde_json::json!({
+                    "key": key,
+                    "value": value,
+                    "modified_index": e["ModifyIndex"].as_u64().unwrap_or(0),
+                })
+            })
+            .collect();
+        Ok(Json(serde_json::json!({ "keys": keys })))
+    } else {
+        Err(backend_error(&format!(
+            "consul list http {}",
+            resp.status()
+        )))
+    }
+}
+
+pub async fn get_config_key(
+    State(state): State<crate::AppState>,
+    Path(key): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    validate_key(&key).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": e})),
+        )
+    })?;
+    let Some(addr) = &state.consul else {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "consul not configured"})),
+        ));
+    };
+    let url = format!("{addr}/v1/kv/{key}?raw=true");
+    let resp = reqwest::get(&url)
+        .await
+        .map_err(|e| backend_error(&e.to_string()))?;
+    if resp.status() == StatusCode::NOT_FOUND {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({"error": "key not found"})),
+        ));
+    }
+    if !resp.status().is_success() {
+        return Err(backend_error(&format!("consul get http {}", resp.status())));
+    }
+    let value = resp
+        .text()
+        .await
+        .map_err(|e| backend_error(&e.to_string()))?;
+    Ok(Json(serde_json::json!({ "key": key, "value": value })))
+}
+
+pub async fn put_config_key(
+    State(state): State<crate::AppState>,
+    Path(key): Path<String>,
+    Json(body): Json<PutConfigKey>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    validate_key(&key).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": e})),
+        )
+    })?;
+    let Some(addr) = &state.consul else {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "consul not configured"})),
+        ));
+    };
+    let client = reqwest::Client::new();
+    let resp = client
+        .put(format!("{addr}/v1/kv/{key}"))
+        .body(body.value)
+        .header("Content-Type", "text/plain")
+        .send()
+        .await
+        .map_err(|e| backend_error(&e.to_string()))?;
+    if resp.status().is_success() {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(backend_error(&format!("consul put http {}", resp.status())))
+    }
+}
+
+pub async fn delete_config_key(
+    State(state): State<crate::AppState>,
+    Path(key): Path<String>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    validate_key(&key).map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": e})),
+        )
+    })?;
+    let Some(addr) = &state.consul else {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "consul not configured"})),
+        ));
+    };
+    let client = reqwest::Client::new();
+    let resp = client
+        .delete(format!("{addr}/v1/kv/{key}"))
+        .send()
+        .await
+        .map_err(|e| backend_error(&e.to_string()))?;
+    if resp.status().is_success() {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(backend_error(&format!(
+            "consul delete http {}",
+            resp.status()
+        )))
+    }
+}
+
+fn backend_error(msg: &str) -> (StatusCode, Json<serde_json::Value>) {
+    (
+        StatusCode::BAD_GATEWAY,
+        Json(serde_json::json!({"error": format!("consul backend: {msg}")})),
+    )
+}
 
 pub struct DynamicConfig {
     pub rate_limit_max: RwLock<u32>,
@@ -119,5 +295,13 @@ mod tests {
         assert!(store.check("ip-1", 0, 0).await.is_ok());
         assert!(store.check("ip-1", 0, 0).await.is_ok());
         assert!(store.check("ip-1", 0, 0).await.is_err());
+    }
+
+    #[test]
+    fn kv_validate_key_requires_prefix() {
+        assert!(validate_key("config/superops/gateway/rate.limit.max").is_ok());
+        assert!(validate_key("config/superops").is_err());
+        assert!(validate_key("other/prefix/x").is_err());
+        assert!(validate_key("").is_err());
     }
 }

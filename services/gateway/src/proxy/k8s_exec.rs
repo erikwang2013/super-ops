@@ -1,12 +1,15 @@
 use axum::{
+    Json,
     extract::{
         Path, Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
-    response::IntoResponse,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
+use std::time::Duration;
 use superops_protos::k8s::v1::ExecRequest;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -15,16 +18,27 @@ use tokio_stream::wrappers::ReceiverStream;
 pub struct ExecQuery {
     pub container: Option<String>,
     pub command: Option<String>,
+    pub confirm: Option<String>,
 }
 
 /// GET /api/k8s/clusters/{cid}/pods/{ns}/{pod}/exec —— WebSocket 交互式终端桥
+/// 会话管控（B3）：require_confirm 配置开启时需带 ?confirm=1；会话时长上限 max_session_secs
 pub async fn exec_pod_ws(
     State(state): State<crate::AppState>,
     Path((cid, ns, pod)): Path<(String, String, String)>,
     Query(q): Query<ExecQuery>,
     ws: WebSocketUpgrade,
-) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| exec_socket(socket, state, cid, ns, pod, q))
+) -> Response {
+    if state.terminal.require_confirm && q.confirm.as_deref() != Some("1") {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "terminal session requires ?confirm=1"})),
+        )
+            .into_response();
+    }
+    let max_session_secs = state.terminal.max_session_secs;
+    ws.on_upgrade(move |socket| exec_socket(socket, state, cid, ns, pod, q, max_session_secs))
+        .into_response()
 }
 
 async fn exec_socket(
@@ -34,6 +48,7 @@ async fn exec_socket(
     ns: String,
     pod: String,
     q: ExecQuery,
+    max_session_secs: u64,
 ) {
     let command = q.command.unwrap_or_else(|| "/bin/sh".into());
     let container = q.container.filter(|c| !c.is_empty()).unwrap_or_default();
@@ -105,24 +120,39 @@ async fn exec_socket(
         }
     });
 
-    // gRPC → ws
-    while let Some(item) = exec_stream.next().await {
-        match item {
-            Ok(resp) => {
-                let mut combined = resp.stdout;
-                if !resp.stderr.is_empty() {
-                    combined.extend_from_slice(&resp.stderr);
-                }
-                if state.recording_enabled {
-                    crate::recorder::record_frame(&state.ch, &rec_session, &rec_node, &combined);
-                }
-                if ws_tx.send(Message::Binary(combined.into())).await.is_err() {
-                    break;
+    // gRPC → ws；B3 会话管控：max_session_secs 到点发送过期消息并断开
+    let timeout = tokio::time::sleep(Duration::from_secs(max_session_secs));
+    tokio::pin!(timeout);
+    loop {
+        tokio::select! {
+            item = exec_stream.next() => {
+                let Some(item) = item else { break };
+                match item {
+                    Ok(resp) => {
+                        let mut combined = resp.stdout;
+                        if !resp.stderr.is_empty() {
+                            combined.extend_from_slice(&resp.stderr);
+                        }
+                        if state.recording_enabled {
+                            crate::recorder::record_frame(&state.ch, &rec_session, &rec_node, &combined);
+                        }
+                        if ws_tx.send(Message::Binary(combined.into())).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = ws_tx
+                            .send(Message::Text(format!("exec error: {e}").into()))
+                            .await;
+                        break;
+                    }
                 }
             }
-            Err(e) => {
+            _ = &mut timeout, if max_session_secs > 0 => {
                 let _ = ws_tx
-                    .send(Message::Text(format!("exec error: {e}").into()))
+                    .send(Message::Text(
+                        format!("session expired: {max_session_secs}s 时长上限，连接已关闭").into(),
+                    ))
                     .await;
                 break;
             }

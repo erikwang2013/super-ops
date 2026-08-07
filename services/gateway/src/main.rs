@@ -1,8 +1,11 @@
+mod alert_rules_api;
 mod alerts_api;
 mod approval_api;
 mod audit_api;
 mod auth;
+mod backup_api;
 mod breaker;
+mod capacity_api;
 mod cmdb_api;
 mod config;
 mod config_remote;
@@ -12,6 +15,7 @@ mod logs_api;
 mod metrics;
 mod metrics_api;
 mod model;
+mod oncall_api;
 mod openapi;
 mod proxy;
 mod recorder;
@@ -19,9 +23,12 @@ mod recorder;
 mod recorder_test;
 mod recordings_api;
 mod registry;
+mod release_api;
 mod routes;
+mod runbook_api;
 mod scripts_api;
 mod secrets_api;
+mod ticket_api;
 mod vault;
 #[cfg(test)]
 mod vault_test;
@@ -53,6 +60,8 @@ pub struct AppState {
     pub approval_enabled: bool,
     pub master_key: Option<Vec<u8>>,
     pub recording_enabled: bool,
+    pub terminal: crate::config::TerminalConfig,
+    pub consul: Option<String>,
 }
 
 #[tokio::main]
@@ -110,6 +119,8 @@ async fn main() -> anyhow::Result<()> {
         approval_enabled: config.approval.enabled,
         master_key,
         recording_enabled: config.recording.enabled,
+        terminal: config.terminal.clone(),
+        consul: config.consul.as_ref().map(|c| c.address.clone()),
     };
     let api_keys = Arc::clone(&state.api_keys);
     tokio::spawn(async move {

@@ -2,10 +2,10 @@ use axum::{
     Json,
     extract::{Extension, Path, Query, State},
     http::{HeaderMap, StatusCode},
-    response::IntoResponse,
 };
 use ecat_auth::AuthClaims;
 use ecat_mq::MessageQueue;
+use futures::StreamExt;
 use serde::Deserialize;
 
 /// 只读 k8s 路由（api:read）：含集群管理（add/remove cluster 为 stub，P5-6 未归类为写权限）。
@@ -39,6 +39,7 @@ pub fn k8s_read_routes() -> axum::Router<crate::AppState> {
             "/api/k8s/clusters/{cluster_id}/metrics",
             axum::routing::get(get_metrics),
         )
+        .route("/api/k8s/aggregate", axum::routing::get(aggregate_clusters))
         .route(
             "/api/v1/metrics/query",
             axum::routing::get(crate::metrics_api::metrics_query),
@@ -62,6 +63,10 @@ pub fn k8s_write_routes() -> axum::Router<crate::AppState> {
             axum::routing::post(restart_deployment),
         )
         .route(
+            "/api/k8s/clusters/{cluster_id}/deployments/{namespace}/{name}/image",
+            axum::routing::post(update_deployment_image),
+        )
+        .route(
             "/api/k8s/clusters/{cluster_id}/deployments/{namespace}/{name}",
             axum::routing::delete(delete_deployment),
         )
@@ -76,65 +81,266 @@ struct PodListQuery {
     page_size: Option<i32>,
 }
 
-async fn list_clusters() -> Json<serde_json::Value> {
-    Json(serde_json::json!({ "clusters": [] }))
+type ApiResult<T> = Result<Json<T>, (StatusCode, Json<serde_json::Value>)>;
+
+async fn connect_client(
+    state: &crate::AppState,
+) -> Result<
+    superops_protos::k8s::v1::k8s_service_client::K8sServiceClient<tonic::transport::Channel>,
+    (StatusCode, Json<serde_json::Value>),
+> {
+    let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
+    superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
+            )
+        })
 }
-async fn add_cluster(Json(body): Json<serde_json::Value>) -> impl IntoResponse {
+
+// D1 跨集群：集群管理/资源列表真实转发 k8s-service（多集群按 cluster_id 路由）
+async fn list_clusters(State(state): State<crate::AppState>) -> ApiResult<serde_json::Value> {
+    let mut client = connect_client(&state).await?;
+    let clusters = client
+        .list_clusters(superops_protos::k8s::v1::ListClustersRequest::default())
+        .await
+        .map_err(|e| status_to_http(e))?
+        .into_inner()
+        .clusters;
+    let clusters: Vec<serde_json::Value> = clusters
+        .iter()
+        .map(|c| {
+            serde_json::json!({
+                "id": c.id, "name": c.name, "version": c.version,
+                "status": c.status, "node_count": c.node_count, "pod_count": c.pod_count,
+            })
+        })
+        .collect();
+    Ok(Json(serde_json::json!({ "clusters": clusters })))
+}
+async fn add_cluster(
+    State(state): State<crate::AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> ApiResult<serde_json::Value> {
     let name = body
         .get("name")
         .and_then(|n| n.as_str())
         .unwrap_or_default()
         .to_string();
-    (
-        StatusCode::CREATED,
-        Json(serde_json::json!({ "id": "pending", "name": name, "status": "connected" })),
-    )
+    let kubeconfig = body
+        .get("kubeconfig")
+        .and_then(|k| k.as_str())
+        .unwrap_or_default()
+        .as_bytes()
+        .to_vec();
+    let mut client = connect_client(&state).await?;
+    let c = client
+        .add_cluster(superops_protos::k8s::v1::AddClusterRequest { name, kubeconfig })
+        .await
+        .map_err(|e| status_to_http(e))?
+        .into_inner()
+        .cluster
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": "add cluster: empty response" })),
+            )
+        })?;
+    Ok(Json(
+        serde_json::json!({ "id": c.id, "name": c.name, "status": c.status }),
+    ))
 }
-async fn get_cluster(Path(cluster_id): Path<String>) -> Json<serde_json::Value> {
-    Json(serde_json::json!({ "cluster": { "id": cluster_id } }))
+async fn get_cluster(
+    State(state): State<crate::AppState>,
+    Path(cluster_id): Path<String>,
+) -> ApiResult<serde_json::Value> {
+    let mut client = connect_client(&state).await?;
+    let c = client
+        .get_cluster(superops_protos::k8s::v1::GetClusterRequest {
+            cluster_id: cluster_id.clone(),
+        })
+        .await
+        .map_err(|e| status_to_http(e))?
+        .into_inner()
+        .cluster
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": format!("cluster {cluster_id} not found") })),
+            )
+        })?;
+    Ok(Json(serde_json::json!({ "cluster": {
+        "id": c.id, "name": c.name, "version": c.version,
+        "status": c.status, "node_count": c.node_count, "pod_count": c.pod_count,
+    } })))
 }
-async fn remove_cluster(Path(_id): Path<String>) -> StatusCode {
-    StatusCode::NO_CONTENT
+async fn remove_cluster(
+    State(state): State<crate::AppState>,
+    Path(cluster_id): Path<String>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let mut client = connect_client(&state).await?;
+    client
+        .remove_cluster(superops_protos::k8s::v1::RemoveClusterRequest { cluster_id })
+        .await
+        .map_err(|e| status_to_http(e))?;
+    Ok(StatusCode::NO_CONTENT)
 }
 async fn list_pods(
+    State(state): State<crate::AppState>,
     Path(cid): Path<String>,
     Query(q): Query<PodListQuery>,
-) -> Json<serde_json::Value> {
-    Json(
-        serde_json::json!({ "pods": [], "cluster_id": cid, "namespace": q.namespace.unwrap_or_default() }),
-    )
+) -> ApiResult<serde_json::Value> {
+    let mut client = connect_client(&state).await?;
+    let pods = client
+        .list_pods(superops_protos::k8s::v1::ListPodsRequest {
+            cluster_id: cid.clone(),
+            namespace: q.namespace.unwrap_or_default(),
+            ..Default::default()
+        })
+        .await
+        .map_err(|e| status_to_http(e))?
+        .into_inner()
+        .pods;
+    let pods: Vec<serde_json::Value> = pods
+        .iter()
+        .map(|p| {
+            serde_json::json!({
+                "name": p.name, "namespace": p.namespace, "status": p.status,
+                "node": p.node, "restarts": p.restarts, "age": p.age,
+            })
+        })
+        .collect();
+    Ok(Json(serde_json::json!({ "cluster_id": cid, "pods": pods })))
 }
 async fn get_pod_logs(
+    State(state): State<crate::AppState>,
     Path((cid, ns, pod)): Path<(String, String, String)>,
-) -> Json<serde_json::Value> {
-    Json(serde_json::json!({ "logs": "", "cluster_id": cid, "pod": pod, "namespace": ns }))
+) -> ApiResult<serde_json::Value> {
+    let mut client = connect_client(&state).await?;
+    let mut stream = client
+        .get_pod_logs(superops_protos::k8s::v1::GetPodLogsRequest {
+            cluster_id: cid.clone(),
+            namespace: ns.clone(),
+            pod_name: pod.clone(),
+            container: String::new(),
+            tail_lines: 200,
+            follow: false,
+        })
+        .await
+        .map_err(|e| status_to_http(e))?
+        .into_inner();
+    let mut lines = Vec::new();
+    while let Some(line) = stream.next().await {
+        match line {
+            Ok(l) => lines.push(l.content),
+            Err(e) => {
+                return Err((
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({ "error": format!("log stream: {e}") })),
+                ));
+            }
+        }
+    }
+    Ok(Json(serde_json::json!({
+        "cluster_id": cid, "pod": pod, "namespace": ns, "logs": lines.join("\n"),
+    })))
 }
-async fn list_deployments(Path(cid): Path<String>) -> Json<serde_json::Value> {
-    Json(serde_json::json!({ "deployments": [], "cluster_id": cid }))
+async fn list_deployments(
+    State(state): State<crate::AppState>,
+    Path(cid): Path<String>,
+) -> ApiResult<serde_json::Value> {
+    let mut client = connect_client(&state).await?;
+    let deps = client
+        .list_deployments(superops_protos::k8s::v1::ListDeploymentsRequest {
+            cluster_id: cid.clone(),
+            namespace: String::new(),
+        })
+        .await
+        .map_err(|e| status_to_http(e))?
+        .into_inner()
+        .deployments;
+    let deps: Vec<serde_json::Value> = deps
+        .iter()
+        .map(|d| {
+            serde_json::json!({
+                "name": d.name, "namespace": d.namespace, "replicas": d.replicas,
+                "ready_replicas": d.ready_replicas, "age": d.age, "images": d.images,
+            })
+        })
+        .collect();
+    Ok(Json(
+        serde_json::json!({ "cluster_id": cid, "deployments": deps }),
+    ))
+}
+
+/// GET /api/k8s/aggregate —— D1 跨集群聚合视图：枚举全部集群并汇总节点/pod 健康度
+pub async fn aggregate_clusters(
+    State(state): State<crate::AppState>,
+) -> ApiResult<serde_json::Value> {
+    let mut client = connect_client(&state).await?;
+    let clusters = client
+        .list_clusters(superops_protos::k8s::v1::ListClustersRequest::default())
+        .await
+        .map_err(|e| status_to_http(e))?
+        .into_inner()
+        .clusters;
+    let mut items = Vec::new();
+    let mut totals = serde_json::json!({ "clusters": clusters.len(), "nodes": 0, "nodes_ready": 0, "pods": 0, "pods_running": 0 });
+    for c in &clusters {
+        let nodes_res = client
+            .list_nodes(superops_protos::k8s::v1::ListNodesRequest {
+                cluster_id: c.id.clone(),
+            })
+            .await;
+        let pods_res = client
+            .list_pods(superops_protos::k8s::v1::ListPodsRequest {
+                cluster_id: c.id.clone(),
+                ..Default::default()
+            })
+            .await;
+        let (nodes_total, nodes_ready) = match nodes_res {
+            Ok(r) => {
+                let n = r.into_inner().nodes;
+                (n.len(), n.iter().filter(|n| n.status == "Ready").count())
+            }
+            Err(_) => (0, 0),
+        };
+        let (pods_total, pods_running) = match pods_res {
+            Ok(r) => {
+                let p = r.into_inner().pods;
+                (p.len(), p.iter().filter(|p| p.status == "Running").count())
+            }
+            Err(_) => (0, 0),
+        };
+        totals["nodes"] = (totals["nodes"].as_i64().unwrap_or(0) + nodes_total as i64).into();
+        totals["nodes_ready"] =
+            (totals["nodes_ready"].as_i64().unwrap_or(0) + nodes_ready as i64).into();
+        totals["pods"] = (totals["pods"].as_i64().unwrap_or(0) + pods_total as i64).into();
+        totals["pods_running"] =
+            (totals["pods_running"].as_i64().unwrap_or(0) + pods_running as i64).into();
+        items.push(serde_json::json!({
+            "id": c.id, "name": c.name, "status": c.status,
+            "nodes": nodes_total, "nodes_ready": nodes_ready,
+            "pods": pods_total, "pods_running": pods_running,
+        }));
+    }
+    Ok(Json(
+        serde_json::json!({ "clusters": items, "totals": totals }),
+    ))
 }
 async fn list_nodes(
     State(state): State<crate::AppState>,
     Path(cid): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
-    let mut client =
-        superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::BAD_GATEWAY,
-                    Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
-                )
-            })?;
+    let mut client = connect_client(&state).await?;
     let nodes = client
-        .list_nodes(superops_protos::k8s::v1::ListNodesRequest::default())
+        .list_nodes(superops_protos::k8s::v1::ListNodesRequest {
+            cluster_id: cid.clone(),
+        })
         .await
-        .map_err(|e| {
-            (
-                StatusCode::BAD_GATEWAY,
-                Json(serde_json::json!({ "error": format!("k8s rpc failed: {e}") })),
-            )
-        })?
+        .map_err(|e| status_to_http(e))?
         .into_inner()
         .nodes;
     let nodes: Vec<serde_json::Value> = nodes
@@ -331,6 +537,63 @@ async fn restart_deployment(
     .await;
     Ok(Json(
         serde_json::json!({ "cluster_id": cid, "deployment": { "namespace": ns, "name": name, "restarted": true } }),
+    ))
+}
+
+async fn update_deployment_image(
+    State(state): State<crate::AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    headers: HeaderMap,
+    Path((cid, ns, name)): Path<(String, String, String)>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let image = body
+        .get("image")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "image 必须为非空字符串" })),
+            )
+        })?;
+    let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
+    let mut client =
+        superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
+                )
+            })?;
+    let resp = client
+        .update_deployment_image(superops_protos::k8s::v1::UpdateDeploymentImageRequest {
+            cluster_id: cid.clone(),
+            namespace: ns.clone(),
+            name: name.clone(),
+            image: image.clone(),
+        })
+        .await
+        .map_err(status_to_http)?
+        .into_inner();
+    publish_audit(
+        &state,
+        "k8s.update-image",
+        claims_username(&claims),
+        &client_ip(&headers),
+        &format!("update deployment {ns}/{name} image to {image}"),
+        &serde_json::json!({
+            "cluster_id": cid.clone(),
+            "namespace": ns.clone(),
+            "name": name.clone(),
+            "image": image.clone(),
+        }),
+    )
+    .await;
+    Ok(Json(
+        serde_json::json!({ "cluster_id": cid, "deployment": { "namespace": ns, "name": name, "image": resp.image } }),
     ))
 }
 

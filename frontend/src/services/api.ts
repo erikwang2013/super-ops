@@ -33,6 +33,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) => request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+  put: <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
@@ -169,3 +170,131 @@ export const fileApi = {
   },
 };
 export { ApiError };
+
+// ---- 告警规则 ----
+export interface AlertRuleRow {
+  id: number; name: string; metric: string; operator: string;
+  threshold: string; level: string; action: string; enabled: boolean;
+}
+
+export const alertRuleApi = {
+  listRules: () => api.get<{ rules: AlertRuleRow[] }>('/alert-rules'),
+  createRule: (body: {
+    name: string; metric: string; operator: string; threshold: string;
+    level: string; action: string; enabled?: boolean;
+  }) => api.post<{ id: number }>('/alert-rules', body),
+  setEnabled: (id: number, enabled: boolean) =>
+    api.patch<undefined>(`/alert-rules/${id}/status`, { enabled }),
+  deleteRule: (id: number) => api.delete<undefined>(`/alert-rules/${id}`),
+};
+
+// ---- 值班排班 ----
+export interface OncallShiftRow {
+  id: number; name: string; assignee: string;
+  start_at: string; end_at: string; created_at: string;
+}
+
+export const oncallApi = {
+  listShifts: () => api.get<{ shifts: OncallShiftRow[] }>('/oncall/shifts'),
+  currentShift: () =>
+    api.get<{ shift: OncallShiftRow | null; message?: string }>('/oncall/shifts/current'),
+  createShift: (body: {
+    name: string; assignee: string; start_at: string; end_at: string;
+  }) => api.post<{ id: number }>('/oncall/shifts', body),
+  deleteShift: (id: number) => api.delete<undefined>(`/oncall/shifts/${id}`),
+};
+
+// ---- 工单 ----
+export interface TicketRow {
+  id: number; title: string; description: string | null; severity: string;
+  status: string; assignee: string; source: string; alert_title: string;
+  created_by: string; created_at: string; updated_at: string;
+}
+
+export const ticketApi = {
+  listTickets: (status?: string) =>
+    api.get<{ tickets: TicketRow[] }>(`/tickets${status ? `?status=${status}` : ''}`),
+  createTicket: (body: {
+    title: string; description?: string; severity?: string;
+    source?: string; alert_title?: string;
+  }) => api.post<{ id: number }>('/tickets', body),
+  setStatus: (id: number, status: string, assignee?: string) =>
+    api.patch<undefined>(`/tickets/${id}/status`, { status, assignee }),
+  deleteTicket: (id: number) => api.delete<undefined>(`/tickets/${id}`),
+};
+
+// ---- 发布流水线 ----
+export interface ReleaseRow {
+  id: number; cluster_id: string; namespace: string; name: string;
+  old_image: string; new_image: string; operator: string;
+  status: string; created_at: string;
+}
+
+export const releaseApi = {
+  listReleases: (status?: string) =>
+    api.get<{ releases: ReleaseRow[] }>(`/releases${status ? `?status=${status}` : ''}`),
+  createRelease: (body: {
+    cluster_id?: string; namespace: string; name: string;
+    old_image?: string; new_image: string; operator?: string;
+  }) => api.post<{ id: number; image: string; status: string }>('/releases', body),
+};
+
+// ---- Runbook 剧本 ----
+export interface RunbookStep { name: string; script_id: number; timeout_s: number; }
+export interface RunbookRow {
+  id: number; name: string; description: string; steps: string;
+  created_by: string; created_at: string;
+}
+export interface RunbookRunRow {
+  id: number; runbook_id: number; runbook_name: string; target_pods: string;
+  status: string; output?: string; started_at: string; finished_at?: string;
+}
+
+export const runbookApi = {
+  listRunbooks: () => api.get<{ runbooks: RunbookRow[] }>('/runbooks'),
+  createRunbook: (body: { name: string; description?: string; steps: string }) =>
+    api.post<{ id: number }>('/runbooks', body),
+  deleteRunbook: (id: number) => api.delete<undefined>(`/runbooks/${id}`),
+  runRunbook: (id: number, body: {
+    cluster_id: string; namespace: string; target_pods: string[];
+  }) => api.post<{ run_id: number; status: string; steps?: number }>(`/runbooks/${id}/run`, body),
+  listRuns: (limit = 50) => api.get<{ runs: RunbookRunRow[] }>(`/runbooks/runs?limit=${limit}`),
+};
+
+// ---- 容量/成本 ----
+export interface CapacitySummary {
+  cpu_cores: number; mem_gib: number; node_count: number;
+  cost_yuan_day: number; cost_yuan_month: number;
+}
+export interface CapacityPoint {
+  bucket: string; cpu_cores: number; mem_gib: number;
+  node_count: number; cost_yuan_day: number;
+}
+
+export const capacityApi = {
+  summary: () => api.get<CapacitySummary>('/capacity/summary'),
+  trend: (hours = 24) => api.get<{ points: CapacityPoint[] }>(`/capacity/trend?hours=${hours}`),
+};
+
+// ---- DB 备份状态 ----
+export interface BackupStatusRow {
+  id: number; db_name: string; target: string; status: string;
+  size_bytes: number; message: string; started_at: string; finished_at?: string;
+}
+export interface BackupSummaryRow {
+  db_name: string; status: string; target: string; size_bytes: number;
+  last_ok_at: string; age_hours: number;
+}
+
+export const backupApi = {
+  listStatus: (limit = 50) => api.get<{ backups: BackupStatusRow[] }>(`/backups/status?limit=${limit}`),
+  summary: () => api.get<{ summaries: BackupSummaryRow[] }>('/backups/summary'),
+};
+
+export interface ConfigKeyRow { key: string; value: string; modified_index: number; }
+export const configRemoteApi = {
+  listKeys: () => api.get<{ keys: ConfigKeyRow[] }>('/config/remote/keys'),
+  getKey: (key: string) => api.get<{ key: string; value: string }>(`/config/remote/keys/${key}`),
+  putKey: (key: string, value: string) => api.put(`/config/remote/keys/${key}`, { value }),
+  deleteKey: (key: string) => api.delete(`/config/remote/keys/${key}`),
+};

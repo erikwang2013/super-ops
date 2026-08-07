@@ -2,7 +2,7 @@ import { ProTable } from '@ant-design/pro-components';
 import { Button, Select, Tag, message } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { alertApi, AlertRow } from '../../services/api';
+import { alertApi, AlertRow, ticketApi } from '../../services/api';
 
 const LEVEL_COLOR: Record<string, string> = {
   CRIT: 'red', critical: 'red',
@@ -32,6 +32,20 @@ export default function AlertsPage() {
     },
     onError: (e: Error) => message.error(e.message),
   });
+  const createTicket = useMutation({
+    mutationFn: (r: AlertRow) => ticketApi.createTicket({
+      title: r.title,
+      severity: r.level === 'critical' ? 'CRIT' : r.level === 'warning' ? 'WARN' : 'LOW',
+      source: 'alert',
+      alert_title: r.title,
+      description: r.message,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tickets'] });
+      message.success('已创建工单');
+    },
+    onError: (e: Error) => message.error(e.message),
+  });
   return <ProTable<AlertRow> rowKey="id" search={false} loading={isLoading}
     dataSource={data?.alerts || []} headerTitle="告警中心" pagination={{ pageSize: 20 }}
     onRow={(r) => ({ style: acked.has(r.id) ? { opacity: 0.5 } : {} })}
@@ -40,9 +54,13 @@ export default function AlertsPage() {
       { title: '级别', dataIndex: 'level', width: 90, render: (_, r) => <Tag color={LEVEL_COLOR[r.level] || 'default'}>{r.level}</Tag> },
       { title: '标题', dataIndex: 'title', width: 180 },
       { title: '消息', dataIndex: 'message', ellipsis: true },
-      { title: '操作', width: 90, render: (_, r) => acked.has(r.id)
-        ? <span style={{ color: '#999' }}>已确认</span>
-        : <Button size="small" type="primary" onClick={() => ack.mutate(r.id)}>确认</Button> },
+      { title: '操作', width: 150, render: (_, r) => <>
+        {acked.has(r.id)
+          ? <span style={{ color: '#999', marginRight: 8 }}>已确认</span>
+          : <Button size="small" type="primary" onClick={() => ack.mutate(r.id)}>确认</Button>}
+        <Button size="small" style={{ marginLeft: 8 }} loading={createTicket.isPending}
+          onClick={() => createTicket.mutate(r)}>建单</Button>
+      </> },
     ]}
     toolBarRender={() => [<Select key="level" value={level} style={{ width: 130 }} onChange={setLevel} options={[
       { value: '', label: '全部' }, { value: 'info', label: 'info' },

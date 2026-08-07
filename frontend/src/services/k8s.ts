@@ -5,6 +5,9 @@ export interface Pod { name: string; namespace: string; status: string; node: st
 export interface Deployment { name: string; namespace: string; replicas: number; ready_replicas: number; age: string; }
 export interface NodeInfo { name: string; status: string; role: string; version: string; cpu: string; memory: string; }
 
+export interface AggregateCluster extends Cluster { nodes_ready: number; pods_running: number; }
+export interface AggregateTotals { clusters: number; nodes: number; nodes_ready: number; pods: number; pods_running: number; }
+
 export const k8sApi = {
   listClusters: () => api.get<{ clusters: Cluster[] }>('/k8s/clusters'),
   addCluster: (name: string, kubeconfig: string) => api.post<{ id: string; name: string; status: string }>('/k8s/clusters', { name, kubeconfig }),
@@ -12,4 +15,5 @@ export const k8sApi = {
   listPods: (clusterId: string, namespace?: string) => api.get<{ pods: Pod[] }>(`/k8s/clusters/${clusterId}/pods?namespace=${namespace || ''}`),
   listDeployments: (clusterId: string) => api.get<{ deployments: Deployment[] }>(`/k8s/clusters/${clusterId}/deployments`),
   listNodes: (clusterId: string) => api.get<{ nodes: NodeInfo[] }>(`/k8s/clusters/${clusterId}/nodes`),
+  aggregate: () => api.get<{ clusters: AggregateCluster[]; totals: AggregateTotals }>('/k8s/aggregate'),
 };

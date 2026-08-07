@@ -101,3 +101,101 @@ CREATE TABLE IF NOT EXISTS secret (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- P6-4: 告警规则引擎（替代 collector 硬编码规则；collector 无 MySQL 时回退内置默认）
+CREATE TABLE IF NOT EXISTS alert_rule (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(128) NOT NULL UNIQUE,
+  metric VARCHAR(32) NOT NULL,      -- node_not_ready/node_ready_pct/pod_not_running/pod_running_pct/deployment_unavailable/deployment_ready_pct
+  operator VARCHAR(4) NOT NULL DEFAULT 'ge',  -- ge(>=) / le(<=)，与 threshold 比较决定是否触发
+  threshold VARCHAR(16) NOT NULL DEFAULT '1', -- 计数类为数量(0-1000)，pct 类为百分比(0-100)
+  level VARCHAR(8) NOT NULL DEFAULT 'WARN',   -- INFO / WARN / CRIT
+  action VARCHAR(16) NOT NULL DEFAULT 'notify', -- notify / restart / scale（scale/restart 由 P6-5 自愈执行）
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 内置默认规则（与旧硬编码 evaluate_health 语义等价；可编辑/禁用/删除）
+INSERT INTO alert_rule (name, metric, operator, threshold, level) VALUES
+  ('node-not-ready', 'node_not_ready', 'ge', '1', 'CRIT'),
+  ('pod-not-running', 'pod_not_running', 'ge', '1', 'WARN'),
+  ('deployment-unavailable', 'deployment_unavailable', 'ge', '1', 'WARN')
+ON DUPLICATE KEY UPDATE metric = VALUES(metric);
+
+-- P6-6: 值班排班（oncall shift；current 查询用 start_at<=NOW() AND end_at>=NOW()）
+CREATE TABLE IF NOT EXISTS oncall_schedule (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(128) NOT NULL,
+  assignee VARCHAR(64) NOT NULL,
+  start_at DATETIME NOT NULL,
+  end_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_oncall_time (start_at, end_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- C1: 工单（ticket；告警中心一键建单 source='alert' 关联 alert_title）
+CREATE TABLE IF NOT EXISTS ticket (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(128) NOT NULL,
+  description TEXT,
+  severity VARCHAR(8) NOT NULL DEFAULT 'LOW',    -- LOW / MEDIUM / HIGH / CRIT
+  status VARCHAR(16) NOT NULL DEFAULT 'open',    -- open / assigned / resolved / closed
+  assignee VARCHAR(64) NOT NULL DEFAULT '',
+  source VARCHAR(16) NOT NULL DEFAULT 'manual',  -- manual / alert
+  alert_title VARCHAR(128) NOT NULL DEFAULT '',  -- source='alert' 时记录来源告警标题
+  created_by VARCHAR(64) NOT NULL DEFAULT '',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_ticket_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- C4: 发布记录（release；发布流水线每次镜像更新落一条审计）
+CREATE TABLE IF NOT EXISTS release (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  cluster_id VARCHAR(64) NOT NULL DEFAULT 'default',
+  namespace VARCHAR(128) NOT NULL,
+  name VARCHAR(128) NOT NULL,
+  old_image VARCHAR(255) NOT NULL DEFAULT '',
+  new_image VARCHAR(255) NOT NULL,
+  operator VARCHAR(64) NOT NULL DEFAULT '',
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',  -- pending / rolling / ok / failed
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_release_target (cluster_id, namespace, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- C2: Runbook 剧本（runbook；steps 为 JSON 数组 [{name,script_id,timeout_s}]，按序执行）
+CREATE TABLE IF NOT EXISTS runbook (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id VARCHAR(64) NOT NULL DEFAULT 'default',
+  name VARCHAR(128) NOT NULL,
+  description TEXT,
+  steps JSON NOT NULL,
+  created_by VARCHAR(64) NOT NULL DEFAULT '',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_runbook_tenant (tenant_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- C2: 剧本执行记录（runbook_run；status: pending / running / ok / failed）
+CREATE TABLE IF NOT EXISTS runbook_run (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  runbook_id BIGINT NOT NULL,
+  target_pods VARCHAR(255) NOT NULL DEFAULT '',
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',
+  output TEXT,
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  finished_at DATETIME NULL,
+  KEY idx_runbook_run_rb (runbook_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- C5: DB 备份状态（backup_status；备份 agent 上报，展示最近备份健康度）
+CREATE TABLE IF NOT EXISTS backup_status (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  db_name VARCHAR(128) NOT NULL,
+  target VARCHAR(255) NOT NULL DEFAULT '',
+  status VARCHAR(16) NOT NULL DEFAULT 'running',  -- running / ok / failed
+  size_bytes BIGINT NOT NULL DEFAULT 0,
+  message VARCHAR(255) NOT NULL DEFAULT '',
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  finished_at DATETIME NULL,
+  KEY idx_backup_db (db_name, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

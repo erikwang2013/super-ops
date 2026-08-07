@@ -16,12 +16,21 @@ import UsersPage from './pages/ops/users';
 import CmdbPage from './pages/cmdb';
 import ScriptsPage from './pages/ops/scripts';
 import AlertsPage from './pages/ops/alerts';
+import AlertRulesPage from './pages/ops/alert-rules';
 import MetricsPage from './pages/ops/metrics';
 import LogsPage from './pages/ops/logs';
 import RecordingsPage from './pages/ops/recordings';
 import ApprovalsPage from './pages/ops/approvals';
 import SecretsPage from './pages/ops/secrets';
 import FilesPage from './pages/ops/files';
+import OncallPage from './pages/ops/oncall';
+import TracesPage from './pages/ops/traces';
+import TicketsPage from './pages/ops/tickets';
+import ReleasesPage from './pages/ops/releases';
+import RunbooksPage from './pages/ops/runbooks';
+import CapacityPage from './pages/ops/capacity';
+import BackupsPage from './pages/ops/backups';
+import ConfigPage from './pages/ops/config';
 
 const menuData = [
   { path: '/dashboard', name: '总览', icon: <DashboardOutlined /> },
@@ -34,9 +43,14 @@ const menuData = [
   { path: '/ops', name: '运维中心', icon: <SettingOutlined />, children: [
     { path: '/ops/audit', name: '审计中心' }, { path: '/ops/apikeys', name: 'API Keys' },
     { path: '/ops/users', name: '用户管理' }, { path: '/ops/scripts', name: '脚本库' },
-    { path: '/ops/alerts', name: '告警中心' }, { path: '/ops/metrics', name: '指标看板' },
+    { path: '/ops/alerts', name: '告警中心' }, { path: '/ops/alert-rules', name: '告警规则' }, { path: '/ops/metrics', name: '指标看板' },
     { path: '/ops/logs', name: '日志检索' }, { path: '/ops/recordings', name: '录制回放' },
     { path: '/ops/approvals', name: '审批中心' }, { path: '/ops/secrets', name: '保险库' },
+    { path: '/ops/oncall', name: '值班排班' }, { path: '/ops/traces', name: '链路追踪' },
+    { path: '/ops/tickets', name: '工单系统' }, { path: '/ops/releases', name: '发布流水线' },
+    { path: '/ops/runbooks', name: 'Runbook 剧本' }, { path: '/ops/capacity', name: '容量/成本' },
+    { path: '/ops/backups', name: 'DB 备份状态' },
+    { path: '/ops/config', name: '配置中心' },
     { path: '/ops/files', name: '文件管理' },
   ]},
 ];
@@ -63,11 +77,20 @@ export default function App() {
           <Route path="/ops/users" element={<UsersPage />} />
           <Route path="/ops/scripts" element={<ScriptsPage />} />
           <Route path="/ops/alerts" element={<AlertsPage />} />
+          <Route path="/ops/alert-rules" element={<AlertRulesPage />} />
           <Route path="/ops/metrics" element={<MetricsPage />} />
           <Route path="/ops/logs" element={<LogsPage />} />
           <Route path="/ops/recordings" element={<RecordingsPage />} />
           <Route path="/ops/approvals" element={<ApprovalsPage />} />
           <Route path="/ops/secrets" element={<SecretsPage />} />
+          <Route path="/ops/oncall" element={<OncallPage />} />
+          <Route path="/ops/traces" element={<TracesPage />} />
+          <Route path="/ops/tickets" element={<TicketsPage />} />
+          <Route path="/ops/releases" element={<ReleasesPage />} />
+          <Route path="/ops/runbooks" element={<RunbooksPage />} />
+          <Route path="/ops/capacity" element={<CapacityPage />} />
+          <Route path="/ops/backups" element={<BackupsPage />} />
+          <Route path="/ops/config" element={<ConfigPage />} />
           <Route path="/ops/files" element={<FilesPage />} />
         </Routes>
       </PageContainer>

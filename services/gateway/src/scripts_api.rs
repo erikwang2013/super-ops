@@ -125,7 +125,7 @@ fn sanitize_pod_name(pod: &str) -> String {
         .collect()
 }
 
-fn build_runner_command(pods: &[String], content: &str) -> String {
+pub fn build_runner_command(pods: &[String], content: &str) -> String {
     let mut head = String::new();
     for p in pods {
         head.push_str(&format!(

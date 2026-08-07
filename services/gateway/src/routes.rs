@@ -186,6 +186,103 @@ pub async fn app(
         state.clone(),
         auth_middleware,
     ));
+    let runbooks = breaker(
+        axum::Router::new()
+            .route(
+                "/api/runbooks",
+                axum::routing::get(crate::runbook_api::list_runbooks_handler)
+                    .post(crate::runbook_api::create_runbook_handler),
+            )
+            .route(
+                "/api/runbooks/runs",
+                axum::routing::get(crate::runbook_api::list_runbook_runs_handler),
+            )
+            .route(
+                "/api/runbooks/{id}",
+                axum::routing::delete(crate::runbook_api::delete_runbook_handler),
+            )
+            .route(
+                "/api/runbooks/{id}/run",
+                axum::routing::post(crate::runbook_api::run_runbook_handler),
+            ),
+    )
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:scripts", req, next)
+    }))
+    .layer(middleware::from_fn(require_tenant))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    let capacity = breaker(
+        axum::Router::new()
+            .route(
+                "/api/capacity/summary",
+                axum::routing::get(crate::capacity_api::capacity_summary_handler),
+            )
+            .route(
+                "/api/capacity/trend",
+                axum::routing::get(crate::capacity_api::capacity_trend_handler),
+            ),
+    )
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:cmdb", req, next)
+    }))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    // D3 配置中心：Consul KV 管理（config/superops 前缀）
+    let config_remote = breaker(
+        axum::Router::new()
+            .route(
+                "/api/config/remote/keys",
+                axum::routing::get(crate::config_remote::list_config_keys),
+            )
+            .route(
+                "/api/config/remote/keys/{key}",
+                axum::routing::get(crate::config_remote::get_config_key)
+                    .put(crate::config_remote::put_config_key)
+                    .delete(crate::config_remote::delete_config_key),
+            ),
+    )
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:cmdb", req, next)
+    }))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    let backups_read = breaker(
+        axum::Router::new()
+            .route(
+                "/api/backups/status",
+                axum::routing::get(crate::backup_api::list_backup_status_handler),
+            )
+            .route(
+                "/api/backups/summary",
+                axum::routing::get(crate::backup_api::backup_summary_handler),
+            ),
+    )
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:cmdb", req, next)
+    }))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    // 备份上报：外部 agent 使用 API key（api:write 权限）回调
+    let backups_write = breaker(axum::Router::new().route(
+        "/api/backups/status",
+        axum::routing::post(crate::backup_api::report_backup_handler),
+    ))
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("api:write", req, next)
+    }))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
     let secrets = axum::Router::new()
         .route(
             "/api/secrets",
@@ -297,6 +394,89 @@ pub async fn app(
         state.clone(),
         auth_middleware,
     ));
+    let alert_rules = breaker(
+        axum::Router::new()
+            .route(
+                "/api/alert-rules",
+                axum::routing::get(crate::alert_rules_api::list_alert_rules)
+                    .post(crate::alert_rules_api::create_alert_rule),
+            )
+            .route(
+                "/api/alert-rules/{id}/status",
+                axum::routing::patch(crate::alert_rules_api::set_alert_rule_enabled),
+            )
+            .route(
+                "/api/alert-rules/{id}",
+                axum::routing::delete(crate::alert_rules_api::delete_alert_rule),
+            ),
+    )
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:cmdb", req, next)
+    }))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    let oncall = breaker(
+        axum::Router::new()
+            .route(
+                "/api/oncall/shifts",
+                axum::routing::get(crate::oncall_api::list_oncall_shifts)
+                    .post(crate::oncall_api::create_oncall_shift),
+            )
+            .route(
+                "/api/oncall/shifts/current",
+                axum::routing::get(crate::oncall_api::current_oncall_shift),
+            )
+            .route(
+                "/api/oncall/shifts/{id}",
+                axum::routing::delete(crate::oncall_api::delete_oncall_shift),
+            ),
+    )
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:cmdb", req, next)
+    }))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    let tickets = breaker(
+        axum::Router::new()
+            .route(
+                "/api/tickets",
+                axum::routing::get(crate::ticket_api::list_tickets_handler)
+                    .post(crate::ticket_api::create_ticket_handler),
+            )
+            .route(
+                "/api/tickets/{id}/status",
+                axum::routing::patch(crate::ticket_api::update_ticket_status_handler),
+            )
+            .route(
+                "/api/tickets/{id}",
+                axum::routing::delete(crate::ticket_api::delete_ticket_handler),
+            ),
+    )
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:cmdb", req, next)
+    }))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    let releases = breaker(
+        axum::Router::new().route(
+            "/api/releases",
+            axum::routing::get(crate::release_api::list_releases_handler)
+                .post(crate::release_api::create_release_handler),
+        ),
+    )
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:cmdb", req, next)
+    }))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
     let login_limited = axum::Router::new()
         .route("/api/auth/login", post(login))
         .layer(
@@ -331,9 +511,18 @@ pub async fn app(
         .merge(approvals)
         .merge(cmdb)
         .merge(scripts)
+        .merge(runbooks)
         .merge(logs)
         .merge(alerts_read)
         .merge(alerts_write)
+        .merge(alert_rules)
+        .merge(oncall)
+        .merge(tickets)
+        .merge(releases)
+        .merge(capacity)
+        .merge(config_remote)
+        .merge(backups_read)
+        .merge(backups_write)
         .merge(users)
         .merge(secrets)
         .merge(recordings_read)
