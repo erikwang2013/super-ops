@@ -31,6 +31,7 @@ fn breaker(router: axum::Router<crate::AppState>) -> axum::Router<crate::AppStat
 }
 
 /// 组装全部 HTTP 路由。请求链路（axum 后注册的层先执行）：
+/// SecurityBodyLayer(URI+headers+body 攻击扫描) → SecurityErrorToResponse(403/500) → Cors → Trace →
 /// auth_middleware → require_tenant(仅 cmdb/scripts) → require_role → breaker → handler
 pub async fn app(
     state: AppState,
@@ -154,6 +155,25 @@ pub async fn app(
         require_role("ops:cmdb", req, next)
     }))
     .layer(middleware::from_fn(require_tenant))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    let quota = breaker(
+        axum::Router::new()
+            .route(
+                "/api/quota",
+                axum::routing::get(crate::quota_api::list_quotas_handler)
+                    .post(crate::quota_api::create_quota),
+            )
+            .route(
+                "/api/quota/{id}",
+                axum::routing::delete(crate::quota_api::delete_quota_handler),
+            ),
+    )
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:cmdb", req, next)
+    }))
     .layer(middleware::from_fn_with_state(
         state.clone(),
         auth_middleware,
@@ -464,11 +484,37 @@ pub async fn app(
         auth_middleware,
     ));
     let releases = breaker(
-        axum::Router::new().route(
-            "/api/releases",
-            axum::routing::get(crate::release_api::list_releases_handler)
-                .post(crate::release_api::create_release_handler),
-        ),
+        axum::Router::new()
+            .route(
+                "/api/releases",
+                axum::routing::get(crate::release_api::list_releases_handler)
+                    .post(crate::release_api::create_release_handler),
+            )
+            .route(
+                "/api/releases/{id}/rollback",
+                axum::routing::post(crate::release_api::rollback_release_handler),
+            ),
+    )
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:cmdb", req, next)
+    }))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    // 混沌演练：实验 CRUD + 执行（restart/delete，转发 k8s-service）
+    let chaos = breaker(
+        axum::Router::new()
+            .route(
+                "/api/chaos",
+                axum::routing::get(crate::chaos_api::list_chaos_handler)
+                    .post(crate::chaos_api::create_chaos_handler),
+            )
+            .route("/api/chaos/{id}", axum::routing::delete(crate::chaos_api::delete_chaos_handler))
+            .route(
+                "/api/chaos/{id}/run",
+                axum::routing::post(crate::chaos_api::run_chaos_handler),
+            ),
     )
     .layer(middleware::from_fn(move |req, next| {
         require_role("ops:cmdb", req, next)
@@ -510,6 +556,7 @@ pub async fn app(
         .merge(audit)
         .merge(approvals)
         .merge(cmdb)
+        .merge(quota)
         .merge(scripts)
         .merge(runbooks)
         .merge(logs)
@@ -519,6 +566,7 @@ pub async fn app(
         .merge(oncall)
         .merge(tickets)
         .merge(releases)
+        .merge(chaos)
         .merge(capacity)
         .merge(config_remote)
         .merge(backups_read)
@@ -549,6 +597,18 @@ pub async fn app(
                     axum::http::header::CONTENT_TYPE,
                     axum::http::header::HeaderName::from_static("x-tenant-id"),
                 ]),
+        )
+        // 攻击扫描置于最外层（ServiceBuilder 先加的层在最外层）：
+        // SecurityErrorToResponse 在外把 SecurityError → 403/500 并满足
+        // Router::layer 的 Error: Into<Infallible>，SecurityBody 在内扫描
+        // URI+headers+body，High/Critical 命中即阻断，其余级别仅记录
+        .layer(
+            tower::ServiceBuilder::new()
+                .layer(crate::security::SecurityErrorToResponseLayer)
+                .layer(
+                    ecat_security::SecurityBodyLayer::new()
+                        .body_limit(10 * 1024 * 1024),
+                ),
         )
         .with_state(state)
         .merge(crate::health::health_router(pool).await))

@@ -7,18 +7,23 @@
 
   <rect x="0" y="0" width="1100" height="720" fill="#ffffff"/>
   <text x="20" y="30" font-size="18" font-weight="bold" fill="#0f172a">SuperOps 请求处理流程</text>
-  <text x="20" y="50" font-size="12" fill="#64748b">一次请求从浏览器到数据落库的完整路径；认证链任一通道通过即可放行</text>
+  <text x="20" y="50" font-size="12" fill="#64748b">一次请求从浏览器到数据落库的完整路径；WAF 层最先拦截攻击请求，认证链任一通道通过即可放行</text>
 
   <!-- 入口 -->
   <rect x="420" y="70" width="260" height="44" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
   <text x="550" y="90" text-anchor="middle" font-weight="bold" fill="#1e40af">浏览器 / Tauri</text>
   <text x="550" y="106" text-anchor="middle" fill="#64748b">HTTP / WebSocket → Gateway :8080</text>
 
+  <!-- WAF 层 -->
+  <rect x="60" y="120" width="980" height="34" rx="8" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="80" y="142" font-weight="bold" fill="#b91c1c">① WAF 层（ecat-security · 路由最外层）</text>
+  <text x="370" y="142" fill="#64748b">扫描 URI + headers + body（≤10MB，读后透传）· SQLi / XSS 等 High/Critical → 403 · 其余级别仅记日志</text>
+
   <!-- 认证链 -->
   <rect x="60" y="160" width="980" height="110" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
   <rect x="60" y="160" width="980" height="30" rx="8" fill="#0f172a"/>
   <rect x="60" y="175" width="980" height="15" fill="#0f172a"/>
-  <text x="80" y="180" font-weight="bold" fill="#ffffff">① 认证（ecat-auth 三通道，任一通过）</text>
+  <text x="80" y="180" font-weight="bold" fill="#ffffff">② 认证（ecat-auth 三通道，任一通过）</text>
   <rect x="80" y="200" width="220" height="52" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.2"/>
   <text x="190" y="222" text-anchor="middle" fill="#334155">Bearer JWT（HS256 验签）</text>
   <text x="190" y="240" text-anchor="middle" fill="#94a3b8">密钥 ≥32 字节 · 过期拒绝</text>
@@ -34,18 +39,18 @@
 
   <!-- 限流 + 熔断 -->
   <rect x="60" y="300" width="480" height="76" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
-  <text x="80" y="322" font-weight="bold" fill="#334155">② 限流（ecat-middleware）</text>
+  <text x="80" y="322" font-weight="bold" fill="#334155">③ 限流（ecat-middleware）</text>
   <text x="80" y="344" fill="#64748b">登录 10 次 / 60s / IP；Redis 共享计数</text>
   <text x="80" y="362" fill="#64748b">Consul KV 阈值热更新即时生效 · 超限 429</text>
 
   <rect x="560" y="300" width="480" height="76" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
-  <text x="580" y="322" font-weight="bold" fill="#334155">③ 熔断（ecat-circuit-breaker）</text>
+  <text x="580" y="322" font-weight="bold" fill="#334155">④ 熔断（ecat-circuit-breaker）</text>
   <text x="580" y="344" fill="#64748b">上游 5xx 连续失败 → 熔断 10s（50% / 30s 窗口）</text>
   <text x="580" y="362" fill="#64748b">熔断期间直接返回 503 · 半开探针恢复</text>
 
   <!-- 代理分支 -->
   <rect x="60" y="410" width="480" height="130" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
-  <text x="80" y="432" font-weight="bold" fill="#334155">④ HTTP 查询代理</text>
+  <text x="80" y="432" font-weight="bold" fill="#334155">⑤ HTTP 查询代理</text>
   <path d="M 90 450 L 90 470 L 300 470" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
   <rect x="130" y="446" width="340" height="48" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.2"/>
   <text x="300" y="466" text-anchor="middle" fill="#334155">gRPC → K8s Service :9091</text>
@@ -54,7 +59,7 @@
   <text x="310" y="516" fill="#64748b" font-size="12">Kubernetes API</text>
 
   <rect x="560" y="410" width="480" height="130" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
-  <text x="580" y="432" font-weight="bold" fill="#334155">⑤ 终端桥（WebSocket ↔ gRPC 双向流）</text>
+  <text x="580" y="432" font-weight="bold" fill="#334155">⑥ 终端桥（WebSocket ↔ gRPC 双向流）</text>
   <path d="M 590 450 L 590 470 L 800 470" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
   <rect x="630" y="446" width="340" height="48" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.2"/>
   <text x="800" y="466" text-anchor="middle" fill="#334155">exec 双向流</text>
@@ -66,7 +71,7 @@
   <rect x="60" y="575" width="980" height="110" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
   <rect x="60" y="575" width="980" height="30" rx="8" fill="#0f172a"/>
   <rect x="60" y="590" width="980" height="15" fill="#0f172a"/>
-  <text x="80" y="595" font-weight="bold" fill="#ffffff">⑥ 数据与可观测闭环</text>
+  <text x="80" y="595" font-weight="bold" fill="#ffffff">⑦ 数据与可观测闭环</text>
   <rect x="80" y="615" width="290" height="52" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.2"/>
   <text x="225" y="637" text-anchor="middle" fill="#334155">审计事件 → Kafka superops.audit</text>
   <text x="225" y="655" text-anchor="middle" fill="#94a3b8">collector 消费 → ClickHouse audit_log</text>

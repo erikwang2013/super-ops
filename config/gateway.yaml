@@ -9,6 +9,12 @@ auth:
 
 database:
   url: "mysql://superops:superops@localhost:3307/superops"
+  # MySQL TLS（可选）：ca_cert/client_cert/client_key 为 PEM 路径；skip_verify: true 时仅加密不校验
+  # tls:
+  #   ca_cert: "/etc/superops/mysql-ca.pem"
+  #   client_cert: "/etc/superops/mysql-client.pem"
+  #   client_key: "/etc/superops/mysql-client-key.pem"
+  #   skip_verify: false
 
 redis:
   url: "redis://localhost:6380"

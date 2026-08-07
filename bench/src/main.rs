@@ -1,6 +1,15 @@
 use ecat_bench::run_bench;
 
-const DEFAULT_URL: &str = "http://localhost:8080/api/auth/login";
+const DEFAULT_LOGIN_URL: &str = "http://localhost:8080/api/auth/login";
+const DEFAULT_HEALTH_URL: &str = "http://localhost:8080/api/health";
+
+async fn health_once(client: &reqwest::Client, url: &str) {
+    match client.get(url).send().await {
+        Ok(r) if r.status().is_success() => {}
+        Ok(r) => eprintln!("health returned {}", r.status()),
+        Err(e) => eprintln!("health request failed: {e}"),
+    }
+}
 
 async fn login_once(client: &reqwest::Client, url: &str) {
     let resp = client
@@ -17,14 +26,31 @@ async fn login_once(client: &reqwest::Client, url: &str) {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let url = std::env::var("BENCH_GATEWAY_URL").unwrap_or_else(|_| DEFAULT_URL.into());
+    let target = std::env::var("BENCH_TARGET").unwrap_or_else(|_| "health".into());
     let client = reqwest::Client::new();
-    let result = run_bench("login", 10, 500, move || {
-        let client = client.clone();
-        let url = url.clone();
-        async move { login_once(&client, &url).await }
-    })
-    .await;
-    result.print();
+    match target.as_str() {
+        "login" => {
+            let url =
+                std::env::var("BENCH_GATEWAY_URL").unwrap_or_else(|_| DEFAULT_LOGIN_URL.into());
+            let result = run_bench("login", 10, 500, move || {
+                let client = client.clone();
+                let url = url.clone();
+                async move { login_once(&client, &url).await }
+            })
+            .await;
+            result.print();
+        }
+        _ => {
+            let url =
+                std::env::var("BENCH_GATEWAY_URL").unwrap_or_else(|_| DEFAULT_HEALTH_URL.into());
+            let result = run_bench("health", 10, 500, move || {
+                let client = client.clone();
+                let url = url.clone();
+                async move { health_once(&client, &url).await }
+            })
+            .await;
+            result.print();
+        }
+    }
     Ok(())
 }

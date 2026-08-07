@@ -69,6 +69,36 @@ export const cmdbApi = {
   getCmdbStats: () => api.get<CmdbStats>('/cmdb/stats'),
 };
 
+export interface QuotaRow {
+  id: number;
+  cluster_id: string;
+  namespace: string;
+  cpu_request: string;
+  memory_request: string;
+  cpu_limit: string;
+  memory_limit: string;
+  replicas: number;
+  description: string;
+  created_at: string;
+}
+
+export interface QuotaInput {
+  cluster_id?: string;
+  namespace: string;
+  cpu_request?: string;
+  memory_request?: string;
+  cpu_limit?: string;
+  memory_limit?: string;
+  replicas?: number;
+  description?: string;
+}
+
+export const quotaApi = {
+  listQuotas: () => api.get<{ quotas: QuotaRow[] }>('/quota'),
+  createQuota: (body: QuotaInput) => api.post<{ id: number }>('/quota', body),
+  deleteQuota: (id: number) => api.delete<undefined>(`/quota/${id}`),
+};
+
 export const scriptApi = {
   listScripts: () => api.get<{ scripts: ScriptItem[] }>('/scripts'),
   createScript: (body: ScriptInput) => api.post<{ id: number }>('/scripts', body),
@@ -237,6 +267,23 @@ export const releaseApi = {
     cluster_id?: string; namespace: string; name: string;
     old_image?: string; new_image: string; operator?: string;
   }) => api.post<{ id: number; image: string; status: string }>('/releases', body),
+  rollbackRelease: (id: number, operator?: string) =>
+    api.post<{ id: number; image: string; status: string }>(`/releases/${id}/rollback`, { operator: operator || '' }),
+};
+
+// ---- 混沌演练 ----
+export interface ChaosRow {
+  id: number; name: string; cluster_id: string; target_type: string;
+  target_name: string; action: string; status: string; operator: string;
+  error?: string | null; started_at?: string | null; ended_at?: string | null; created_at: string;
+}
+export const chaosApi = {
+  listExperiments: () => api.get<{ experiments: ChaosRow[] }>('/chaos'),
+  createExperiment: (body: {
+    name: string; cluster_id?: string; target_name: string; action: string; operator?: string;
+  }) => api.post<{ id: number }>('/chaos', body),
+  runExperiment: (id: number) => api.post<{ status: string }>(`/chaos/${id}/run`, {}),
+  deleteExperiment: (id: number) => api.delete(`/chaos/${id}`),
 };
 
 // ---- Runbook 剧本 ----

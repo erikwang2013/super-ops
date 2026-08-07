@@ -31,6 +31,9 @@ import RunbooksPage from './pages/ops/runbooks';
 import CapacityPage from './pages/ops/capacity';
 import BackupsPage from './pages/ops/backups';
 import ConfigPage from './pages/ops/config';
+import ChaosPage from './pages/ops/chaos';
+import QuotaPage from './pages/ops/quota';
+import GrafanaPage from './pages/ops/grafana';
 
 const menuData = [
   { path: '/dashboard', name: '总览', icon: <DashboardOutlined /> },
@@ -48,10 +51,12 @@ const menuData = [
     { path: '/ops/approvals', name: '审批中心' }, { path: '/ops/secrets', name: '保险库' },
     { path: '/ops/oncall', name: '值班排班' }, { path: '/ops/traces', name: '链路追踪' },
     { path: '/ops/tickets', name: '工单系统' }, { path: '/ops/releases', name: '发布流水线' },
-    { path: '/ops/runbooks', name: 'Runbook 剧本' }, { path: '/ops/capacity', name: '容量/成本' },
+    { path: '/ops/runbooks', name: 'Runbook 剧本' }, { path: '/ops/chaos', name: '混沌演练' },
+    { path: '/ops/capacity', name: '容量/成本' },
     { path: '/ops/backups', name: 'DB 备份状态' },
     { path: '/ops/config', name: '配置中心' },
     { path: '/ops/files', name: '文件管理' },
+    { path: '/ops/quota', name: '资源配额' }, { path: '/ops/grafana', name: 'Grafana' },
   ]},
 ];
 
@@ -88,10 +93,13 @@ export default function App() {
           <Route path="/ops/tickets" element={<TicketsPage />} />
           <Route path="/ops/releases" element={<ReleasesPage />} />
           <Route path="/ops/runbooks" element={<RunbooksPage />} />
+          <Route path="/ops/chaos" element={<ChaosPage />} />
           <Route path="/ops/capacity" element={<CapacityPage />} />
           <Route path="/ops/backups" element={<BackupsPage />} />
           <Route path="/ops/config" element={<ConfigPage />} />
           <Route path="/ops/files" element={<FilesPage />} />
+          <Route path="/ops/quota" element={<QuotaPage />} />
+          <Route path="/ops/grafana" element={<GrafanaPage />} />
         </Routes>
       </PageContainer>
     </ProLayout>

@@ -1,6 +1,6 @@
 # SuperOps — 智能运维平台
 
-基于 [e-cat](https://github.com/erik/e-cat) 框架生态构建的智能运维平台（v1.5.0）。API 网关统一承载认证、限流、熔断与反向代理；Kubernetes 资源服务提供查询、日志、Watch 与终端 exec；Collector 负责指标采集、巡检与告警；Tauri 桌面前端完成可视化操作。
+基于 [e-cat](https://github.com/erik/e-cat) 框架生态构建的智能运维平台（v1.7.0）。API 网关统一承载认证、限流、熔断与反向代理；Kubernetes 资源服务提供查询、日志、Watch 与终端 exec；Collector 负责指标采集、巡检与告警；Tauri 桌面前端完成可视化操作。
 
 ## 项目说明
 
@@ -11,7 +11,7 @@ SuperOps 面向中小规模基础设施运维，提供一条从「看见」到�
 - **可观测**：Prometheus 指标抓取、OTLP 链路追踪（Jaeger）、ClickHouse 时序落库
 - **协同**：Consul 注册发现 + 远程配置、Kafka 审计事件总线
 
-四阶段演进（已全部完成）：P1 MVP（认证 + 资源查询）→ P2 韧性与可观测（熔断/限流/注册/追踪）→ P3 集成与对外（exec 终端、API Key、OAuth2、OpenAPI）→ P4–P6 运营闭环（P4 写操作/审计/用户管理 → P5 日志/CMDB/脚本库/RBAC → P6 治理/审批/多租户/保险库/录制/文件/告警/指标/Helm）。
+四阶段演进（已全部完成）：P1 MVP（认证 + 资源查询）→ P2 韧性与可观测（熔断/限流/注册/追踪）→ P3 集成与对外（exec 终端、API Key、OAuth2、OpenAPI）→ P4–P6 运营闭环（P4 写操作/审计/用户管理 → P5 日志/CMDB/脚本库/RBAC → P6 治理/审批/多租户/保险库/录制/文件/告警/指标/Helm）→ 生态扩展（混沌演练/资源配额/发布回滚/WAF 扫描/配置漂移/告警通知精细化/压测与 TLS）。
 
 ## 技术架构
 
@@ -54,14 +54,18 @@ super-ops/
 │   │       ├── auth/          #    JWT 签发/校验（ecat-auth）、API Key、OAuth2 短路、登录注册
 │   │       ├── proxy/         #    k8s 反向代理（HTTP 查询 + WS 终端桥）
 │   │       ├── breaker.rs     #    熔断（FiveXx→Error 转换链）
+│   │       ├── security.rs    #    WAF 错误转换层（SecurityError → 403/500）
 │   │       ├── config_remote.rs #  Consul KV 热更新（DynamicRateLimitStore）
 │   │       ├── metrics*.rs    #    Prometheus 导出 + 指标查询 API
 │   │       ├── cmdb_api.rs / logs_api.rs / scripts_api.rs #  日志检索 / CMDB / 脚本库
+│   │       ├── quota_api.rs   #    资源配额（resource_quota upsert）
+│   │       ├── chaos_api.rs   #    混沌演练（实验 CRUD + 执行）
 │   │       ├── approval_api.rs #   审批工作流（delete 门禁）
 │   │       ├── secrets_api.rs / vault.rs # 凭据保险库（AES-256-GCM，主密钥未配置 → 503）
 │   │       ├── recordings_api.rs / recorder.rs # 终端录制（ClickHouse exec_session）
 │   │       ├── files_api.rs   #    文件上传/下载（10MB multipart，MinIO）
 │   │       ├── alerts_api.rs  #    告警中心（列表/确认）
+│   │       ├── release_api.rs #    发布流水线（记录 + 手动回滚）
 │   │       └── openapi.rs     #    /api/docs 文档
 │   ├── k8s/                   #  K8s 资源服务 :9091（gRPC）
 │   │   └── src/
@@ -74,6 +78,8 @@ super-ops/
 │           ├── logtail.rs     #    Pod 日志采集 → ClickHouse
 │           ├── inspect.rs     #    巡检（Redis 分布式锁互斥）
 │           ├── alert.rs       #    告警规则与事件写入
+│           ├── drift.rs       #    配置漂移检测（CMDB vs 实际）
+│           ├── rollback.rs    #    发布自动回滚（观察窗口）
 │           ├── housekeeping.rs #   治理：MySQL 备份 / 容量与成本估算
 │           └── events.rs      #    Kafka 审计事件消费
 ├── frontend/                  # React + Vite + Tauri 2（:3000）
@@ -81,7 +87,7 @@ super-ops/
 ├── ecat-*/                    # e-cat 框架组件（workspace 成员）
 ├── superops-protos/           # protobuf 生成代码（common.v1 / k8s.v1）
 ├── protos/                    # proto 源文件（buf 管理）
-├── bench/                     # ecat-bench 压测入口（login）
+├── bench/                     # ecat-bench 压测入口（BENCH_TARGET=health|login）
 ├── config/                    # 各服务 YAML 配置
 ├── deploy/                    # docker-compose.yml + init.sql + prometheus.yml + helm/superops（Chart）
 └── docs/                      # 审查报告 / 实施计划 / 架构图
@@ -108,16 +114,20 @@ super-ops/
 | 文件 | `POST /api/files`（multipart 10MB 上限，文件名白名单）+ `GET /api/files/{name}`，MinIO 存储，api:write/api:read |
 | 告警中心 | `GET /api/alerts?level=&limit=50`（ClickHouse `alert_event`，ops:cmdb）、`POST /api/alerts/{id}/ack`（api:write，幂等）、`GET /api/alerts/acks` |
 | 告警规则 | `/api/alert-rules`（GET/POST/PATCH/DELETE，MySQL `alert_rule` 表，ops:cmdb）；collector 按规则求值（连续 N 次超标触发，`max_not_ready` 节点数限制），规则 `action=restart/scale` 触发自愈 |
-| 告警通知 | 通知通道 generic/dingtalk/wecom webhook + SMTP 邮件（`kind=email`，收件人逗号分隔多个，密码可经 `SUPEROPS_SMTP_PASSWORD` 覆盖）；按 target 静默窗口（默认 300s） |
+| 告警通知 | 通知通道 generic/dingtalk/wecom webhook + SMTP 邮件（`kind=email`，收件人逗号分隔多个，密码可经 `SUPEROPS_SMTP_PASSWORD` 覆盖）；`levels` 字段按级别过滤投递（不写则全量）；邮件与 webhook 通知附加当前值班人（需配置 mysql）；按 target 静默窗口（默认 300s） |
+| 混沌演练 | `/api/chaos`（GET/POST 实验 CRUD）、`/api/chaos/{id}`（DELETE）、`/api/chaos/{id}/run`（POST 执行 restart/delete，转发 k8s-service），ops:cmdb；前端 `/ops/chaos` 页 |
 | 自愈 | 规则 `action=restart/scale` 时 collector 调用 k8s restart/scale（`selfheal.enabled` **默认关闭**，`max_actions_per_cycle` 限制），动作入审计 |
 | 工单 | `/api/tickets`（GET/POST，status 流转 open→in_progress→resolved/closed，reopen）、`/api/tickets/{id}`（GET/PATCH/DELETE）；告警一键建单（`GET /api/alerts` 行内操作） |
 | Runbook | `/api/runbooks`（GET/POST，`steps` JSON 数组）、`/api/runbooks/{id}`（GET/PATCH/DELETE）、`/api/runbooks/{id}/run`（顺序执行各步骤并返回逐步结果） |
 | 值班排班 | `/api/oncall`（GET/POST，排班记录 + 值班人员字段） |
-| 发布流水线 | k8s-service gRPC `UpdateImage`（deployment 镜像更新）+ `/api/releases`（GET/POST 发布记录）+ 前端发布页 |
+| 发布流水线 | k8s-service gRPC `UpdateImage`（deployment 镜像更新）+ `/api/releases`（GET/POST 发布记录）+ `/api/releases/{id}/rollback`（手动回滚到旧镜像，无旧镜像 400）+ 前端发布页（回滚按钮 + 确认）；collector `rollback` 任务自动回滚（发布 ok 后 delay 秒进入观察窗口，deployment ready==0 或缺失时恢复旧镜像并标记 failed，**默认关闭**） |
 | 容量/成本 | `/api/capacity/summary`、`/api/capacity/trend`（ClickHouse 汇聚，节点/Pod 数、成本估算时间序列） |
 | 备份状态 | `/api/backups/status`（GET 列表 / POST 上报，agent 经 API key 回调）、`/api/backups/summary`（按库汇总 + 时效统计） |
 | 终端管控 | exec WS 需 `?confirm=1`（`terminal.require_confirm` 默认开，未带返回 400）+ `terminal.max_session_secs` 超时强制断开（默认 1800s），前端会话前弹确认框 |
 | 配置中心 | `/api/config/remote/keys`（GET 递归列出 `config/superops` 前缀 Consul KV）、`/api/config/remote/keys/{key}`（GET/PUT/DELETE，key 越界 400，Consul 不可达 502），ops:cmdb |
+| 资源配额 | `resource_quota` 表（UNIQUE cluster_id+namespace）+ `/api/quota`（GET/POST upsert，replicas 限额）、`/api/quota/{id}`（DELETE），ops:cmdb；前端 `/ops/quota` 页 |
+| 安全扫描 | 全请求 WAF 层（ecat-security `SecurityBodyLayer`，最外层）：扫描 URI+headers+body（最多 10MB，body 读后透传），SQLi/XSS 等 High/Critical 命中 → 403 `{"error":...}`，其余级别仅记日志 |
+| MySQL TLS | `database.tls` 配置段（ecat-tls）：ca_cert/client_cert/client_key PEM 路径 + skip_verify（true=仅加密不校验域名 / false=VerifyIdentity 全校验） |
 | 跨集群聚合 | `/api/k8s/aggregate`：全集群节点/Pod 健康汇总（`nodes_ready`=Ready 节点数、`pods_running`=Running Pod 数 + totals） |
 | 指标看板 | 前端 `/ops/metrics` 复用 `GET /api/v1/metrics/query`（api:read） |
 | 治理 | collector `housekeeping`：MySQL 备份（mysqldump → `data/backups`，保留 N 份）、磁盘容量与成本估算（collector.yaml `housekeeping:` 段） |
@@ -128,13 +138,13 @@ super-ops/
 集群管理（kubeconfig）、Pod/Deployment/Node 查询（Node 含 Ready 状态与 kubelet 版本）、Deployment scale/restart/delete 写操作（gRPC `ScaleDeployment`/`RestartDeployment`/`DeleteDeployment`）、批量执行（gRPC `RunJob` → batch/v1 Job，shell 脚本）、Pod 日志流（tail/follow）、资源 Watch（ADDED/MODIFIED/DELETED）、exec 双向流（stdin/stdout/stderr + resize）。
 
 ### Collector
-按调度周期采集指标 → ClickHouse 快照；日志采集（logtail.rs：周期采集 Pod 日志 → ClickHouse）；巡检任务经 Redis 锁保证单实例执行；告警规则求值（读 MySQL `alert_rule`，连续 N 次超标触发，`max_not_ready` 限制节点级告警，`action=restart/scale` 时执行自愈动作——`selfheal.enabled` 默认关闭）；告警通知（generic/钉钉/企微 webhook + SMTP 邮件 `kind=email`，按 target 静默窗口，默认 300s）；治理任务（housekeeping.rs：MySQL 备份 + 容量/成本估算）；Kafka 审计事件消费（ecat-mq-kafka）；OTLP span 导出。
+按调度周期采集指标 → ClickHouse 快照；日志采集（logtail.rs：周期采集 Pod 日志 → ClickHouse）；巡检任务经 Redis 锁保证单实例执行；告警规则求值（读 MySQL `alert_rule`，连续 N 次超标触发，`max_not_ready` 限制节点级告警，`action=restart/scale` 时执行自愈动作——`selfheal.enabled` 默认关闭）；告警通知（generic/钉钉/企微 webhook + SMTP 邮件 `kind=email`，`levels` 级别过滤 + 值班人附加，按 target 静默窗口，默认 300s）；配置漂移检测（drift.rs：CMDB deployment 资产 vs 集群实际 deployment，差异写 ClickHouse `drift_event`，`drift.enabled` **默认关闭**）；发布自动回滚（rollback.rs：`status=ok` 的发布在 `delay_secs` 后进入 `window_secs` 观察窗口，deployment 缺失或 ready==0 且 replicas>0 时恢复旧镜像并标记 failed，`rollback.enabled` **默认关闭**）；治理任务（housekeeping.rs：MySQL 备份 + 容量/成本估算）；Kafka 审计事件消费（ecat-mq-kafka）；OTLP span 导出。
 
 ### Frontend（:3000）
-登录、集群列表/详情、Pod 列表与日志、Deployment、Node、终端页（WS 双向流，token query 鉴权、binaryType 处理、可选容器、会话前确认框 + 服务端超时断开）；dashboard 卡片接入真实接口（集群数 / Docker 主机数（metrics query，临时指标 app）/ 活跃告警（告警中心接口））+ 集群健康聚合卡片（每集群节点/Pod Ready 汇总 + totals）；CMDB 资产页（`/cmdb`，ProTable + 新建弹窗，菜单位于 Kubernetes 与运维中心之间）；脚本库页（`/ops/scripts`，脚本列表 + 运行记录双 ProTable）；运维中心（`/ops/audit` 审计、`/ops/apikeys` API Key、`/ops/users` 用户管理、`/ops/alerts` 告警中心（10s 轮询 + 确认 + 一键建单）、`/ops/alert-rules` 告警规则（CRUD + 启用开关）、`/ops/metrics` 指标看板（复用 metrics query）、`/ops/logs` 日志检索（条件 + 时间范围）、`/ops/recordings` 录制回放（帧按 seq 定序）、`/ops/approvals` 审批中心（状态过滤 + 通过/拒绝/取消/reopen）、`/ops/secrets` 保险库（加密存储 + 解密查看/复制，主密钥未配置时展示 503 提示）、`/ops/files` 文件管理（multipart 上传 / 按名下载）、`/ops/oncall` 值班排班、`/ops/traces` 链路追踪（Jaeger UI 嵌入）、`/ops/tickets` 工单系统（状态流转）、`/ops/releases` 发布流水线（镜像更新 + 记录）、`/ops/runbooks` Runbook 剧本（步骤执行）、`/ops/capacity` 容量/成本趋势（手写 SVG 图）、`/ops/backups` DB 备份状态、`/ops/config` 配置中心（Consul KV 浏览/编辑/删除））；Pods/Deployments/Nodes 独立页带集群选择器（默认首个集群，不再硬编码 `default`；集群详情页内嵌场景不受影响）。
+登录、集群列表/详情、Pod 列表与日志、Deployment、Node、终端页（WS 双向流，token query 鉴权、binaryType 处理、可选容器、会话前确认框 + 服务端超时断开）；dashboard 卡片接入真实接口（集群数 / Docker 主机数（metrics query，临时指标 app）/ 活跃告警（告警中心接口））+ 集群健康聚合卡片（每集群节点/Pod Ready 汇总 + totals）；CMDB 资产页（`/cmdb`，ProTable + 新建弹窗，菜单位于 Kubernetes 与运维中心之间）；脚本库页（`/ops/scripts`，脚本列表 + 运行记录双 ProTable）；运维中心（`/ops/audit` 审计、`/ops/apikeys` API Key、`/ops/users` 用户管理、`/ops/alerts` 告警中心（10s 轮询 + 确认 + 一键建单）、`/ops/alert-rules` 告警规则（CRUD + 启用开关）、`/ops/metrics` 指标看板（复用 metrics query）、`/ops/logs` 日志检索（条件 + 时间范围）、`/ops/recordings` 录制回放（帧按 seq 定序）、`/ops/approvals` 审批中心（状态过滤 + 通过/拒绝/取消/reopen）、`/ops/secrets` 保险库（加密存储 + 解密查看/复制，主密钥未配置时展示 503 提示）、`/ops/files` 文件管理（multipart 上传 / 按名下载）、`/ops/oncall` 值班排班、`/ops/traces` 链路追踪（Jaeger UI 嵌入）、`/ops/tickets` 工单系统（状态流转）、`/ops/releases` 发布流水线（镜像更新 + 记录 + 回滚按钮）、`/ops/chaos` 混沌演练（实验 CRUD + 执行）、`/ops/runbooks` Runbook 剧本（步骤执行）、`/ops/capacity` 容量/成本趋势（手写 SVG 图）、`/ops/backups` DB 备份状态、`/ops/config` 配置中心（Consul KV 浏览/编辑/删除）、`/ops/quota` 资源配额（集群+命名空间限额）、`/ops/grafana` Grafana 嵌入页（iframe sandbox，URL 优先级 `?url=` > `VITE_GRAFANA_URL` > localhost:3000））；Pods/Deployments/Nodes 独立页带集群选择器（默认首个集群，不再硬编码 `default`；集群详情页内嵌场景不受影响）。
 
 ### API 一览（OpenAPI 见 /api/docs）
-`/api/auth/register|login`、`/api/keys`（CRUD）、`/api/users`（`PATCH /{id}/status` 启用/禁用）、`/api/audit/events`（审计查询，limit/offset/level）、`/api/logs/search`（日志检索）、`/api/cmdb/assets`（GET/POST）、`/api/cmdb/stats`（GET）、`/api/cmdb/assets/{id}`（DELETE）、`/api/scripts`（GET/POST）、`/api/scripts/{id}`（DELETE）、`/api/scripts/{id}/run`（POST）、`/api/scripts/runs`（GET）、`/api/approvals`（GET/POST，delete 审批门禁）、`/api/approvals/{id}/decide`（POST）、`/api/secrets`（GET/POST）、`/api/secrets/{name}`（GET/DELETE）、`/api/recordings`（GET）、`/api/recordings/{sid}`（DELETE）、`/api/recordings/{sid}/frames`（GET）、`/api/files`（POST 上传）、`/api/files/{name}`（GET 下载）、`/api/alerts`（GET，level/limit）、`/api/alerts/{id}/ack`（POST）、`/api/alerts/acks`（GET）、`/api/alert-rules`（GET/POST/PATCH/DELETE，规则引擎）、`/api/tickets`（GET/POST）、`/api/tickets/{id}`（GET/PATCH/DELETE）、`/api/runbooks`（GET/POST）、`/api/runbooks/{id}`（GET/PATCH/DELETE）、`/api/runbooks/{id}/run`（POST）、`/api/oncall`（GET/POST）、`/api/releases`（GET/POST）、`/api/capacity/summary|trend`（GET）、`/api/backups/status`（GET/POST）、`/api/backups/summary`（GET）、`/api/config/remote/keys`（GET）、`/api/config/remote/keys/{key}`（GET/PUT/DELETE，Consul KV）、`/api/k8s/aggregate`（GET，跨集群汇总）、`/api/k8s/clusters[/{id}][/pods|/deployments|/nodes|/metrics]`、`/api/k8s/clusters/{id}/pods/{ns}/{pod}/logs|exec`（exec 需 `?confirm=1`）、`/api/k8s/clusters/{id}/deployments/{ns}/{name}/scale|restart`（`DELETE` 删除）、`/api/v1/metrics/query`、`/api/health`、`/api/docs`。
+`/api/auth/register|login`、`/api/keys`（CRUD）、`/api/users`（`PATCH /{id}/status` 启用/禁用）、`/api/audit/events`（审计查询，limit/offset/level）、`/api/logs/search`（日志检索）、`/api/cmdb/assets`（GET/POST）、`/api/cmdb/stats`（GET）、`/api/cmdb/assets/{id}`（DELETE）、`/api/scripts`（GET/POST）、`/api/scripts/{id}`（DELETE）、`/api/scripts/{id}/run`（POST）、`/api/scripts/runs`（GET）、`/api/approvals`（GET/POST，delete 审批门禁）、`/api/approvals/{id}/decide`（POST）、`/api/secrets`（GET/POST）、`/api/secrets/{name}`（GET/DELETE）、`/api/recordings`（GET）、`/api/recordings/{sid}`（DELETE）、`/api/recordings/{sid}/frames`（GET）、`/api/files`（POST 上传）、`/api/files/{name}`（GET 下载）、`/api/alerts`（GET，level/limit）、`/api/alerts/{id}/ack`（POST）、`/api/alerts/acks`（GET）、`/api/alert-rules`（GET/POST/PATCH/DELETE，规则引擎）、`/api/tickets`（GET/POST）、`/api/tickets/{id}`（GET/PATCH/DELETE）、`/api/runbooks`（GET/POST）、`/api/runbooks/{id}`（GET/PATCH/DELETE）、`/api/runbooks/{id}/run`（POST）、`/api/oncall`（GET/POST）、`/api/releases`（GET/POST）、`/api/releases/{id}/rollback`（POST）、`/api/chaos`（GET/POST）、`/api/chaos/{id}`（DELETE）、`/api/chaos/{id}/run`（POST）、`/api/quota`（GET/POST）、`/api/quota/{id}`（DELETE）、`/api/capacity/summary|trend`（GET）、`/api/backups/status`（GET/POST）、`/api/backups/summary`（GET）、`/api/config/remote/keys`（GET）、`/api/config/remote/keys/{key}`（GET/PUT/DELETE，Consul KV）、`/api/k8s/aggregate`（GET，跨集群汇总）、`/api/k8s/clusters[/{id}][/pods|/deployments|/nodes|/metrics]`、`/api/k8s/clusters/{id}/pods/{ns}/{pod}/logs|exec`（exec 需 `?confirm=1`）、`/api/k8s/clusters/{id}/deployments/{ns}/{name}/scale|restart`（`DELETE` 删除）、`/api/v1/metrics/query`、`/api/health`、`/api/docs`。
 
 ## 快速开始
 
@@ -192,7 +202,7 @@ cd frontend && npm install && npm run dev    # http://localhost:3000
 
 ## 测试与 CI
 
-- workspace 单测/集成测试 391 项全过（gateway 91 / k8s 14 / collector 44 / ecat 组件，见 `docs/audit-report-2026-08-06.md` 测试矩阵）
+- workspace 单测/集成测试 408 项全过（gateway 97 / k8s 14 / collector 55 / ecat 组件，见 `docs/audit-report-2026-08-06.md` 测试矩阵）
 - 端到端与安全验证：登录/注册、k8s 路由正误路径、认证绕过、JWT 伪造、限流 429、熔断 503、API Key 生命周期（见 `docs/audit-report-2026-08-06.md`）
 - 运行时验证：Consul 注册/注销、KV 热更新（阈值 3↔10 双向生效）、Jaeger span、Prometheus target up
 - CI（`.github/workflows/ci.yml`）：`cargo fmt --check` + `cargo check` + `cargo test` + `npm run build`
@@ -211,6 +221,8 @@ cd frontend && npm install && npm run dev    # http://localhost:3000
 - **多租户**：tenant 由客户端 `x-tenant-id` 头断言（无服务端租户目录）；头缺失回落 `default`，存在但畸形返回 400（严格模式）
 - **录制开关**：`recording.enabled` 默认开启（`config/gateway.yaml`）；回放帧上限 5000（ORDER BY timestamp, seq）
 - **单实例部署**：限流计数为 Redis 共享，但服务本身单实例
+- **WAF 边界**：安全扫描对 headers/body 明文 payload 有效；URI 中的百分号编码 payload 不在扫描范围（scanner 不解码）；`/api/files` 上传等大 body 扫描上限 10MB（超限 500）
+- **自动回滚**：`rollback.enabled` 默认关闭（collector.yaml）；开启后仅在观察窗口内（`delay_secs`~`delay_secs+window_secs`）对 `status=ok` 且存在旧镜像的发布生效，deployment 缺失或 `ready==0 && replicas>0` 才触发（扩容中 replicas=0 不误判）
 
 ## 文档
 

@@ -1,6 +1,6 @@
 import { ProTable } from '@ant-design/pro-components';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { App, Button, Form, Input, Modal, Select, Tag } from 'antd';
+import { App, Button, Form, Input, Modal, Popconfirm, Select, Tag } from 'antd';
 import { useState } from 'react';
 import { ReleaseRow, releaseApi } from '../../services/api';
 
@@ -32,6 +32,15 @@ export default function ReleasesPage() {
     onError: (e: any) => message.error(e.message || '发布失败'),
   });
 
+  const rollback = useMutation({
+    mutationFn: (id: number) => releaseApi.rollbackRelease(id),
+    onSuccess: (r: any) => {
+      message.success(r.status === 'ok' ? '已回滚到旧镜像' : '回滚失败，已记录');
+      invalidate();
+    },
+    onError: (e: any) => message.error(e.message || '回滚失败'),
+  });
+
   return <>
     <ProTable<ReleaseRow> rowKey="id" loading={isLoading} search={false}
       dataSource={data?.releases || []} headerTitle="发布流水线（更新 Deployment 镜像并记录）"
@@ -47,6 +56,14 @@ export default function ReleasesPage() {
         { title: '操作人', dataIndex: 'operator', render: (_, r) => r.operator || '-' },
         { title: '状态', dataIndex: 'status', render: (_, r) => <Tag color={statusColor[r.status]}>{r.status}</Tag> },
         { title: '时间', dataIndex: 'created_at', width: 160 },
+        {
+          title: '操作', key: 'ops', width: 90, render: (_, r) =>
+            r.old_image !== '-' && r.old_image ? (
+              <Popconfirm title="确认回滚到旧镜像？" onConfirm={() => rollback.mutate(r.id)}>
+                <Button type="link" size="small">回滚</Button>
+              </Popconfirm>
+            ) : <span style={{ color: '#bbb' }}>—</span>,
+        },
       ]} />
     <Modal title="发起发布" open={open} onCancel={() => setOpen(false)}
       onOk={() => form.submit()} confirmLoading={create.isPending} destroyOnClose>

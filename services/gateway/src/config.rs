@@ -79,6 +79,9 @@ pub struct AuthConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
     pub url: String,
+    // MySQL 连接 TLS（可选）：ca_cert/client_cert/client_key 为 PEM 路径，skip_verify 跳过域名校验
+    #[serde(default)]
+    pub tls: Option<ecat_tls::TlsClientConfig>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

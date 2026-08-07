@@ -1,12 +1,14 @@
 use axum::{
     Json,
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
 use serde::Deserialize;
 
-use crate::model::release::{list_releases, record_release, validate_release};
+use crate::model::release::{
+    get_release, list_releases, record_release, validate_release,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct ListReleasesQuery {
@@ -126,6 +128,95 @@ pub async fn create_release_handler(
         Err(e) => (
             StatusCode::BAD_GATEWAY,
             Json(serde_json::json!({ "error": format!("release record failed: {e}") })),
+        )
+            .into_response(),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RollbackRequest {
+    #[serde(default)]
+    pub operator: String,
+}
+
+/// 手动回滚：把 Deployment 镜像恢复为该发布记录发布前的 old_image，并落一条新记录（operator 为空时记 rollback）。
+pub async fn rollback_release_handler(
+    State(state): State<crate::AppState>,
+    Path(id): Path<i64>,
+    Json(req): Json<RollbackRequest>,
+) -> impl IntoResponse {
+    let Some(rel) = get_release(&state.pool, id).await.ok().flatten() else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "release not found" })),
+        )
+            .into_response();
+    };
+    if rel.old_image == "-" || rel.old_image.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "该发布没有可回滚的旧镜像（old_image 为空）" })),
+        )
+            .into_response();
+    }
+    let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
+    let mut client =
+        match superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                return (
+                    StatusCode::BAD_GATEWAY,
+                    Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
+                )
+                    .into_response();
+            }
+        };
+    let update = client
+        .update_deployment_image(superops_protos::k8s::v1::UpdateDeploymentImageRequest {
+            cluster_id: rel.cluster_id.clone(),
+            namespace: rel.namespace.clone(),
+            name: rel.name.clone(),
+            image: rel.old_image.clone(),
+        })
+        .await;
+    let (status, err_msg) = match update {
+        Ok(_) => ("ok", None),
+        Err(e) => ("failed", Some(e.to_string())),
+    };
+    let operator = if req.operator.is_empty() {
+        "rollback"
+    } else {
+        &req.operator
+    };
+    let inserted = record_release(
+        &state.pool,
+        &rel.cluster_id,
+        &rel.namespace,
+        &rel.name,
+        &rel.new_image,
+        &rel.old_image,
+        operator,
+        status,
+    )
+    .await;
+    if let Some(e) = err_msg {
+        return (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({ "error": format!("rollback failed: {e}") })),
+        )
+            .into_response();
+    }
+    match inserted {
+        Ok(new_id) => (
+            StatusCode::CREATED,
+            Json(serde_json::json!({ "id": new_id, "image": rel.old_image, "status": status })),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({ "error": format!("rollback record failed: {e}") })),
         )
             .into_response(),
     }

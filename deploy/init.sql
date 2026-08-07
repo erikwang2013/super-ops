@@ -199,3 +199,36 @@ CREATE TABLE IF NOT EXISTS backup_status (
   finished_at DATETIME NULL,
   KEY idx_backup_db (db_name, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 混沌演练（chaos_experiment；action: restart / delete，target_type 固定 deployment；status: idle / running / completed / failed）
+CREATE TABLE IF NOT EXISTS chaos_experiment (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(64) NOT NULL,
+  cluster_id VARCHAR(64) NOT NULL DEFAULT 'default',
+  target_type VARCHAR(16) NOT NULL DEFAULT 'deployment',
+  target_name VARCHAR(128) NOT NULL,
+  action VARCHAR(16) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'idle',
+  operator VARCHAR(64) NOT NULL DEFAULT '',
+  error TEXT,
+  started_at DATETIME NULL,
+  ended_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_chaos_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- P7-3: 资源配额 — 集群命名空间配额登记（cluster_id + namespace 唯一）
+CREATE TABLE IF NOT EXISTS resource_quota (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    cluster_id VARCHAR(64) NOT NULL DEFAULT 'default',
+    namespace VARCHAR(64) NOT NULL,
+    cpu_request VARCHAR(32) DEFAULT '',
+    memory_request VARCHAR(32) DEFAULT '',
+    cpu_limit VARCHAR(32) DEFAULT '',
+    memory_limit VARCHAR(32) DEFAULT '',
+    replicas INT DEFAULT 0,
+    description VARCHAR(256) DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_quota (cluster_id, namespace)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

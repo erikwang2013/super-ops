@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.7.0] — 2026-08-07 — 扩展点实施（安全纵深 + 发布闭环 + 告警精细化 + 长尾）
+
+### Added
+- **安全纵深（WAF 层）**：gateway 接入 `ecat-security` `SecurityBodyLayer`（URI + headers + body 攻击扫描，10MB 上限，High/Critical → 403，其余 → 500），置于路由最外层；新增 `security.rs` 错误→响应转换层（downcast `SecurityError`）+ 4 个攻击拦截测试（SQLi/XSS/header 注入）
+- **发布回滚闭环**：`POST /api/releases/{id}/rollback` 手动回滚；collector `rollback.rs` 自动回滚（发布后观察窗口内健康检查 `ready==0` 且存在旧镜像 → 自动回滚并出审计）
+- **配置漂移检测**：collector `drift.rs` 任务（CMDB 记录 vs 集群实际资源对比 → `drift_event` 告警）
+- **混沌演练**：`chaos` 表 + `/api/chaos` CRUD/触发（action=kill-pod/scale，演练入审计）；前端 `/ops/chaos` 页
+- **告警精细化**：通知规则支持 `levels` 过滤 + 值班人联动（匹配 oncall 排班）
+- **资源配额**：`quota` 表（UNIQUE cluster_id+namespace）+ `/api/quota` upsert；前端 `/ops/quota` 页
+- **Grafana 嵌入页**：`/ops/grafana`（iframe sandbox，URL 优先级：配置 → k8s NodePort → 默认）
+- **ecat-bench 压测入口**：`BENCH_TARGET=health|login` 场景；**MySQL TLS**：`database.tls` 段（ecat-tls，ca_cert/client_cert/client_key/skip_verify）
+
+### Changed
+- Gateway 功能表、API 一览、已知边界、Collector/Frontend 段同步更新（新增安全扫描、回滚、配额、混沌、Grafana、漂移条目）
+- 请求链路文档更新：SecurityBodyLayer → SecurityErrorToResponse → Cors → Trace → auth → tenant → role → breaker → handler
+
+### Verified
+- workspace **408 项测试全过（0 失败）**（gateway 97 / k8s 14 / collector 55 / ecat 组件）；`cargo fmt --check` / `cargo check --workspace` / `npm run build` 全绿
+
 ## [1.6.0] — 2026-08-07 — 生态缺口闭环（B 类修复 + C 类缺失域 + D 类扩展）
 
 ### Added

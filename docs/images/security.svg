@@ -1,13 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 700" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 760" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif" font-size="13">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#64748b"/>
     </marker>
   </defs>
 
-  <rect x="0" y="0" width="1100" height="700" fill="#ffffff"/>
+  <rect x="0" y="0" width="1100" height="760" fill="#ffffff"/>
   <text x="20" y="30" font-size="18" font-weight="bold" fill="#0f172a">SuperOps 安全防护</text>
-  <text x="20" y="50" font-size="12" fill="#64748b">六道防线 + 熔断兜底；Phase 1 安全审查发现的问题已全部修复并重新验证</text>
+  <text x="20" y="50" font-size="12" fill="#64748b">七道防线 + WAF 兜底 + 熔断兜底；Phase 1 安全审查发现的问题已全部修复并重新验证</text>
 
   <!-- 第一行 -->
   <rect x="60" y="80" width="300" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
@@ -53,17 +53,25 @@
   <text x="760" y="348" fill="#334155">· 头 Authorization / Content-Type</text>
   <text x="760" y="368" fill="#334155">· 恶意 origin 无 ACAO 头</text>
 
+  <!-- 第七道防线：WAF -->
+  <rect x="60" y="430" width="980" height="90" rx="8" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+  <rect x="60" y="430" width="980" height="26" rx="8" fill="#dc2626"/>
+  <rect x="60" y="443" width="980" height="13" fill="#dc2626"/>
+  <text x="80" y="448" font-weight="bold" fill="#ffffff">⑦ 全请求 WAF 层（ecat-security SecurityBodyLayer · 路由最外层）</text>
+  <text x="80" y="478" fill="#334155">· 扫描 URI + headers + body（上限 10MB，body 读后透传 handler）</text>
+  <text x="80" y="498" fill="#334155">· SQLi / XSS 等 High / Critical 命中 → 403 {"error":...} · 其余级别仅记日志</text>
+
   <!-- 熔断兜底 -->
-  <rect x="60" y="450" width="980" height="100" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
-  <rect x="60" y="450" width="980" height="28" rx="8" fill="#0f172a"/>
-  <rect x="60" y="464" width="980" height="14" fill="#0f172a"/>
-  <text x="80" y="469" font-weight="bold" fill="#ffffff">熔断兜底（ecat-circuit-breaker）</text>
-  <text x="80" y="500" fill="#334155">· 上游 5xx 连续失败 → 熔断 10s（50% / 30s 窗口）→ 熔断期间直接返回 503</text>
-  <text x="80" y="522" fill="#334155">· 半开探针自动探测 · 上游恢复后放行</text>
+  <rect x="60" y="550" width="980" height="90" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="60" y="550" width="980" height="28" rx="8" fill="#0f172a"/>
+  <rect x="60" y="564" width="980" height="14" fill="#0f172a"/>
+  <text x="80" y="569" font-weight="bold" fill="#ffffff">熔断兜底（ecat-circuit-breaker）</text>
+  <text x="80" y="596" fill="#334155">· 上游 5xx 连续失败 → 熔断 10s（50% / 30s 窗口）→ 熔断期间直接返回 503</text>
+  <text x="80" y="616" fill="#334155">· 半开探针自动探测 · 上游恢复后放行</text>
 
   <!-- 验证 -->
-  <rect x="60" y="580" width="980" height="90" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
-  <text x="80" y="604" font-weight="bold" fill="#1e40af">已修复并重新验证（Phase 1 安全审查）</text>
-  <text x="80" y="628" fill="#334155">· 无 token → 401 · 伪造 / 篡改 token → 401 · 合法 token → 200（clusters / pods / exec）</text>
-  <text x="80" y="650" fill="#334155">· 爆破 401×9 → 429×3（窗口总量精确 10 次）· API Key 创建 / 使用 / 吊销 200 / 204 / 401</text>
+  <rect x="60" y="670" width="980" height="70" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+  <text x="80" y="694" font-weight="bold" fill="#1e40af">已修复并重新验证（Phase 1 安全审查 + WAF 层新增测试）</text>
+  <text x="80" y="718" fill="#334155">· 无 token → 401 · 伪造 / 篡改 token → 401 · 合法 token → 200 · 爆破 401×9 → 429×3</text>
+  <text x="80" y="736" fill="#334155">· SQLi / XSS body、header 注入 → 403（WAF 4 项新测试全过）</text>
 </svg>

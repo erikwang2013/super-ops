@@ -29,10 +29,10 @@
   <text x="520" y="302" fill="#94a3b8">熔断</text>
   <text x="40" y="320" fill="#334155">│   │       ├── config_remote.rs</text>
   <text x="520" y="320" fill="#94a3b8">Consul KV 热更新</text>
-  <text x="40" y="338" fill="#334155">│   │       ├── metrics*.rs</text>
-  <text x="520" y="338" fill="#94a3b8">/metrics + 指标查询</text>
-  <text x="40" y="356" fill="#334155">│   │       ├── cmdb_api.rs / logs_api.rs / scripts_api.rs</text>
-  <text x="520" y="356" fill="#94a3b8">日志检索 / CMDB / 脚本库</text>
+  <text x="40" y="338" fill="#334155">│   │       ├── metrics*.rs / security.rs</text>
+  <text x="520" y="338" fill="#94a3b8">/metrics + 指标查询 + WAF 攻击扫描（ecat-security）</text>
+  <text x="40" y="356" fill="#334155">│   │       ├── cmdb_api.rs / logs_api.rs / scripts_api.rs / quota_api.rs / chaos_api.rs / release_api.rs</text>
+  <text x="520" y="356" fill="#94a3b8">日志检索 / CMDB / 脚本库 / 配额 / 混沌 / 发布回滚</text>
   <text x="40" y="374" fill="#334155">│   │       └── openapi.rs</text>
   <text x="520" y="374" fill="#94a3b8">/api/docs</text>
   <text x="40" y="392" fill="#334155">│   ├── k8s/</text>
@@ -55,12 +55,12 @@
   <text x="520" y="554" fill="#94a3b8">巡检（Redis 锁互斥）</text>
   <text x="40" y="572" fill="#334155">│           ├── alert.rs</text>
   <text x="520" y="572" fill="#94a3b8">告警写入 + 通知（notify.rs）</text>
-  <text x="40" y="590" fill="#334155">│           └── events.rs</text>
-  <text x="520" y="590" fill="#94a3b8">Kafka 审计消费</text>
+  <text x="40" y="590" fill="#334155">│           └── events.rs / drift.rs / rollback.rs</text>
+  <text x="520" y="590" fill="#94a3b8">Kafka 审计消费 / 配置漂移检测 / 发布自动回滚</text>
   <text x="40" y="608" fill="#0f172a" font-weight="bold">├── frontend/</text>
   <text x="520" y="608" fill="#94a3b8">React + Vite + Tauri 2（:3000）</text>
   <text x="40" y="626" fill="#334155">│   └── src/pages/</text>
-  <text x="520" y="626" fill="#94a3b8">k8s（集群/Pod/终端/日志）+ cmdb + ops（审计/API Keys/用户/脚本）</text>
+  <text x="520" y="626" fill="#94a3b8">k8s（集群/Pod/终端/日志）+ cmdb + ops（审计/API Keys/用户/脚本/告警规则/混沌/配额/发布回滚）</text>
 
   <!-- ecat 归组 -->
   <rect x="36" y="634" width="1010" height="170" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
@@ -80,7 +80,7 @@
   <text x="40" y="824" fill="#334155">├── protos/</text>
   <text x="520" y="824" fill="#94a3b8">proto 源文件（buf 管理）</text>
   <text x="40" y="842" fill="#334155">├── bench/</text>
-  <text x="520" y="842" fill="#94a3b8">ecat-bench 压测入口（login）</text>
+  <text x="520" y="842" fill="#94a3b8">ecat-bench 压测入口（health / login）</text>
   <text x="40" y="860" fill="#334155">├── examples/</text>
   <text x="520" y="860" fill="#94a3b8">使用示例</text>
   <text x="40" y="878" fill="#334155">├── config/</text>

@@ -25,12 +25,12 @@
   <text x="80" y="284" fill="#94a3b8" font-size="11.5">限流 + 熔断挂载</text>
   <text x="80" y="308" fill="#334155">proxy.rs</text>
   <text x="80" y="324" fill="#94a3b8" font-size="11.5">gRPC 代理 → :9091</text>
-  <text x="80" y="348" fill="#334155">metrics.rs</text>
-  <text x="80" y="364" fill="#94a3b8" font-size="11.5">/metrics 指标</text>
-  <text x="80" y="388" fill="#334155">openapi.rs</text>
-  <text x="80" y="404" fill="#94a3b8" font-size="11.5">/api/docs 文档</text>
-  <text x="80" y="428" fill="#334155">cmdb/logs/scripts API</text>
-  <text x="80" y="444" fill="#94a3b8" font-size="11.5">日志检索 · CMDB · 脚本库</text>
+  <text x="80" y="348" fill="#334155">metrics.rs / openapi.rs</text>
+  <text x="80" y="364" fill="#94a3b8" font-size="11.5">/metrics 指标 · /api/docs 文档</text>
+  <text x="80" y="388" fill="#334155">security.rs</text>
+  <text x="80" y="404" fill="#94a3b8" font-size="11.5">WAF 攻击扫描（ecat-security，最外层）</text>
+  <text x="80" y="428" fill="#334155">cmdb/logs/scripts/quota/chaos/release API</text>
+  <text x="80" y="444" fill="#94a3b8" font-size="11.5">日志检索 · CMDB · 脚本库 · 配额 · 混沌 · 发布回滚</text>
   <text x="80" y="468" fill="#334155">config.rs</text>
   <text x="80" y="484" fill="#94a3b8" font-size="11.5">配置 + 哨兵检查</text>
   <text x="80" y="508" fill="#334155">Consul 注册 / KV 热更新</text>
@@ -91,8 +91,8 @@
   <text x="640" y="484" fill="#94a3b8" font-size="11.5">ecat-mq-kafka</text>
   <text x="640" y="508" fill="#334155">健康 / 指标</text>
   <text x="640" y="524" fill="#94a3b8" font-size="11.5">ecat-health / ecat-metrics</text>
-  <text x="640" y="548" fill="#334155">notify.rs</text>
-  <text x="640" y="564" fill="#94a3b8" font-size="11.5">告警通知（webhook/钉钉/企微）</text>
+  <text x="640" y="548" fill="#334155">notify.rs / drift.rs / rollback.rs</text>
+  <text x="640" y="564" fill="#94a3b8" font-size="11.5">告警通知 / 漂移检测 / 发布自动回滚</text>
 
   <!-- Frontend -->
   <rect x="900" y="80" width="180" height="488" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
@@ -114,22 +114,23 @@
   <text x="918" y="376" fill="#334155">vite 构建</text>
   <text x="918" y="392" fill="#94a3b8" font-size="11.5">tsc + vite build</text>
   <text x="918" y="418" fill="#334155">pages/ops/</text>
-  <text x="918" y="434" fill="#94a3b8" font-size="11.5">审计 / API Keys / 用户 / 脚本</text>
+  <text x="918" y="434" fill="#94a3b8" font-size="11.5">审计 / API Keys / 用户 / 脚本 / 混沌 / 配额</text>
   <text x="918" y="458" fill="#334155">pages/cmdb/</text>
   <text x="918" y="474" fill="#94a3b8" font-size="11.5">资产台账（ProTable）</text>
   <text x="918" y="498" fill="#334155">dashboard.tsx</text>
   <text x="918" y="514" fill="#94a3b8" font-size="11.5">集群/主机/告警真实数据</text>
 
   <!-- 框架 -->
-  <rect x="60" y="570" width="1020" height="80" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="60" y="570" width="1020" height="94" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
   <rect x="60" y="570" width="1020" height="28" rx="8" fill="#0f172a"/>
   <rect x="60" y="584" width="1020" height="14" fill="#0f172a"/>
-  <text x="80" y="589" font-weight="bold" fill="#ffffff">e-cat 框架组件（32 处 ecat 依赖）</text>
+  <text x="80" y="589" font-weight="bold" fill="#ffffff">e-cat 框架组件（37 处 ecat 依赖）</text>
   <text x="80" y="618" fill="#334155">ecat-auth · ecat-middleware · ecat-circuit-breaker · ecat-config-remote · ecat-config</text>
   <text x="80" y="638" fill="#334155">ecat-registry(-consul) · ecat-mq(-kafka) · ecat-scheduler · ecat-lock · ecat-data(-sqlx/-clickhouse/-redis) · ecat-tracing-otlp · ecat-openapi</text>
+  <text x="80" y="656" fill="#334155">ecat-security · ecat-tls · ecat-bench</text>
 
   <!-- 验证 -->
   <rect x="60" y="670" width="1020" height="54" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
   <text x="80" y="692" font-weight="bold" fill="#1e40af">验证状态</text>
-  <text x="80" y="712" fill="#334155">workspace 333 项测试通过 · cargo fmt / check 零警告 · e2e 21/21 · 安全专项 15/15 · 前端 tsc + build 通过</text>
+  <text x="80" y="712" fill="#334155">workspace 408 项测试通过 · cargo fmt / check 零警告 · e2e 21/21 · 安全专项 15/15 · 前端 tsc + build 通过</text>
 </svg>

@@ -22,11 +22,17 @@ otlp: "http://localhost:4317"
 
 notify:
   silence_secs: 300
-  # B4: 通知通道 —— webhook(generic/dingtalk/wecom) 或邮件(email，收件人写在 url，逗号分隔多个)
+  # 通知通道 —— webhook(generic/dingtalk/wecom) 或邮件(email，收件人写在 url，逗号分隔多个)
+  # levels: 只投递指定级别（CRITICAL/ERROR/WARN/INFO），不写则全部级别；邮件正文与 webhook 通知会附加当前值班人（需配置 mysql）
   targets: []
   # - name: mail-ops
   #   kind: email
   #   url: "ops@example.com,oncall@example.com"
+  #   levels: [CRITICAL, ERROR]
+  # - name: dingtalk-critical
+  #   kind: dingtalk
+  #   url: "https://oapi.dingtalk.com/robot/send?access_token=xxx"
+  #   levels: [CRITICAL]
 
 # B4: SMTP 配置（kind=email 的 notify target 需要；密码可用 SUPEROPS_SMTP_PASSWORD 覆盖）
 # smtp:
@@ -48,11 +54,23 @@ housekeeping:
   enabled: true
   interval_secs: 86400
 
+# 配置漂移检测：对比 CMDB deployment 资产与集群实际 deployment，差异写 ClickHouse drift_event（需配置 mysql）
+drift:
+  enabled: false
+  interval_secs: 3600
+
 # P6-5: 自愈动作（规则 action=restart/scale 时执行；默认关闭，需显式开启）
 selfheal:
   enabled: false
   cluster_id: "default"
   max_actions_per_cycle: 5
+
+# P7-3: 发布自动回滚 — status=ok 的发布在 delay 秒后进入观察窗口，deployment ready==0 或缺失时自动回滚
+rollback:
+  enabled: false
+  interval_secs: 120
+  delay_secs: 120
+  window_secs: 3600
 
 mysql:
   host: "localhost"

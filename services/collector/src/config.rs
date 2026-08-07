@@ -150,6 +150,28 @@ pub struct HousekeepingConfig {
     pub interval_secs: u64,
 }
 
+// 配置漂移检测：CMDB deployment 资产 vs 集群实际 deployment（需要 mysql 配置）
+#[derive(Debug, Clone, Deserialize)]
+pub struct DriftConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_drift_interval")]
+    pub interval_secs: u64,
+}
+
+impl Default for DriftConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            interval_secs: default_drift_interval(),
+        }
+    }
+}
+
+fn default_drift_interval() -> u64 {
+    3600
+}
+
 impl Default for HousekeepingConfig {
     fn default() -> Self {
         Self {
@@ -157,6 +179,42 @@ impl Default for HousekeepingConfig {
             interval_secs: default_housekeeping_interval(),
         }
     }
+}
+
+// 发布自动回滚：status=ok 的发布在 delay 秒后进入观察窗口，deployment ready==0 或缺失时自动回滚
+#[derive(Debug, Clone, Deserialize)]
+pub struct RollbackConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_rollback_interval")]
+    pub interval_secs: u64,
+    #[serde(default = "default_rollback_delay")]
+    pub delay_secs: u64,
+    #[serde(default = "default_rollback_window")]
+    pub window_secs: u64,
+}
+
+impl Default for RollbackConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            interval_secs: default_rollback_interval(),
+            delay_secs: default_rollback_delay(),
+            window_secs: default_rollback_window(),
+        }
+    }
+}
+
+fn default_rollback_interval() -> u64 {
+    120
+}
+
+fn default_rollback_delay() -> u64 {
+    120
+}
+
+fn default_rollback_window() -> u64 {
+    3600
 }
 
 fn default_housekeeping_interval() -> u64 {
@@ -206,7 +264,11 @@ pub struct Config {
     #[serde(default)]
     pub housekeeping: HousekeepingConfig,
     #[serde(default)]
+    pub drift: DriftConfig,
+    #[serde(default)]
     pub selfheal: SelfhealConfig,
+    #[serde(default)]
+    pub rollback: RollbackConfig,
     #[serde(default)]
     pub mysql: Option<MysqlConfig>,
     #[serde(default)]

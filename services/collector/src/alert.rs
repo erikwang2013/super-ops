@@ -495,6 +495,8 @@ async fn inspect_work(cfg: &Config) -> anyhow::Result<()> {
         .timeout(std::time::Duration::from_secs(5))
         .build()
         .unwrap_or_default();
+    // 值班联动：查一次当前值班人，追加进通知；库不可达仅告警不阻断
+    let oncall = oncall_assignee(cfg).await;
     for t in &cfg.notify.targets {
         let mut silencer = crate::notify::NotifySilencer::default();
         let fresh: Vec<AlertEvent> = health
@@ -509,7 +511,15 @@ async fn inspect_work(cfg: &Config) -> anyhow::Result<()> {
         if fresh.is_empty() {
             continue;
         }
-        if let Err(e) = crate::notify::dispatch(t, &fresh, &http, cfg.smtp.as_ref()).await {
+        if let Err(e) = crate::notify::dispatch_with_oncall(
+            t,
+            &fresh,
+            &http,
+            cfg.smtp.as_ref(),
+            oncall.as_deref(),
+        )
+        .await
+        {
             tracing::warn!("notify target {} failed: {e}", t.name);
         }
     }
@@ -517,4 +527,23 @@ async fn inspect_work(cfg: &Config) -> anyhow::Result<()> {
         execute_selfheal(cfg, &mut client, &deps, ch.as_ref(), &rules).await;
     }
     Ok(())
+}
+
+/// 查询当前值班人；mysql 未配置或查询失败返回 None（联动失败不阻断告警）
+async fn oncall_assignee(cfg: &Config) -> Option<String> {
+    let Some(mysql) = &cfg.mysql else {
+        return None;
+    };
+    let opts = MySqlConnectOptions::new()
+        .host(&mysql.host)
+        .port(mysql.port)
+        .username(&mysql.user)
+        .password(&mysql.password)
+        .database(&mysql.database);
+    let pool = MySqlPoolOptions::new()
+        .max_connections(1)
+        .connect_with(opts)
+        .await
+        .ok()?;
+    crate::notify::current_oncall(&pool).await
 }

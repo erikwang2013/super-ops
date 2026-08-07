@@ -1,5 +1,7 @@
 mod alert_rules_api;
 mod alerts_api;
+mod chaos_api;
+mod quota_api;
 mod approval_api;
 mod audit_api;
 mod auth;
@@ -28,6 +30,7 @@ mod routes;
 mod runbook_api;
 mod scripts_api;
 mod secrets_api;
+mod security;
 mod ticket_api;
 mod vault;
 #[cfg(test)]
@@ -44,7 +47,7 @@ use ecat_mq_kafka::KafkaMq;
 use ecat_registry::{Registration, Registry, ServiceInfo};
 use ecat_registry_consul::ConsulRegistry;
 use ecat_transport_http::HttpServer;
-use sqlx::mysql::MySqlPool;
+use sqlx::mysql::{MySqlConnectOptions, MySqlPool, MySqlPoolOptions, MySqlSslMode};
 use std::sync::{Arc, Mutex, RwLock};
 
 #[derive(Clone)]
@@ -62,6 +65,34 @@ pub struct AppState {
     pub recording_enabled: bool,
     pub terminal: crate::config::TerminalConfig,
     pub consul: Option<String>,
+}
+
+async fn mysql_pool(config: &Config) -> anyhow::Result<MySqlPool> {
+    let opts: MySqlConnectOptions = config.database.url.parse()?;
+    let opts = if let Some(tls) = &config.database.tls {
+        if tls.is_enabled() {
+            let mut o = opts.ssl_mode(if tls.skip_verify == Some(true) {
+                MySqlSslMode::Required
+            } else {
+                MySqlSslMode::VerifyIdentity
+            });
+            if let Some(ca) = &tls.ca_cert {
+                o = o.ssl_ca(ca);
+            }
+            if let (Some(cert), Some(key)) = (&tls.client_cert, &tls.client_key) {
+                o = o.ssl_client_cert(cert).ssl_client_key(key);
+            }
+            o
+        } else {
+            opts
+        }
+    } else {
+        opts
+    };
+    Ok(MySqlPoolOptions::new()
+        .max_connections(10)
+        .connect_with(opts)
+        .await?)
 }
 
 #[tokio::main]
@@ -88,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
         Arc::clone(&dynamic_cfg),
     ));
     let alert_acks = Arc::new(crate::alerts_api::AlertAckStore::connect(&config.redis.url).await);
-    let pool = MySqlPool::connect(&config.database.url).await?;
+    let pool = mysql_pool(&config).await?;
     let ch = Arc::new(
         ClickhouseClient::from_config(config.ch.clone())
             .map_err(|e| anyhow::anyhow!("clickhouse config: {e}"))?,

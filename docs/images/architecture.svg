@@ -30,6 +30,7 @@
   <text x="56" y="338" fill="#334155">· OpenAPI 文档 /api/docs</text>
   <text x="56" y="358" fill="#334155">· 指标 /metrics + OTLP 追踪导出</text>
   <text x="56" y="378" fill="#334155">· Consul 注册 / 发现 / KV 热更新</text>
+  <text x="56" y="392" fill="#b91c1c">· WAF：URI+headers+body 攻击扫描（ecat-security，最外层）</text>
 
   <rect x="400" y="200" width="300" height="200" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
   <rect x="400" y="200" width="300" height="34" rx="8" fill="#0f172a"/>
@@ -54,6 +55,7 @@
   <text x="776" y="338" fill="#334155">· Kafka 审计事件消费（ecat-mq-kafka）</text>
   <text x="776" y="358" fill="#334155">· gateway 指标查询 API 的数据源</text>
   <text x="776" y="378" fill="#334155">· Consul 注册</text>
+  <text x="776" y="392" fill="#b91c1c">· 配置漂移检测 + 发布自动回滚（drift / rollback）</text>
 
   <!-- Data layer -->
   <rect x="40" y="470" width="150" height="56" rx="8" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
@@ -134,7 +136,8 @@
   <path d="M 285 580 L 285 636" stroke="#2563eb" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
   <text x="470" y="216" fill="#2563eb" font-size="12">OTLP 追踪导出（gateway / k8s）</text>
 
-  <rect x="40" y="700" width="1020" height="60" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="60" y="722" font-weight="bold" fill="#334155">e-cat 框架组件</text>
-  <text x="60" y="744" fill="#64748b">ecat-auth · ecat-circuit-breaker · ecat-config-remote · ecat-registry(-consul) · ecat-mq-kafka · ecat-scheduler · ecat-lock · ecat-data-clickhouse · ecat-middleware · ecat-tracing-otlp · ecat-openapi · ecat-bench</text>
+  <rect x="40" y="700" width="1020" height="76" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="60" y="720" font-weight="bold" fill="#334155">e-cat 框架组件</text>
+  <text x="60" y="740" fill="#64748b">ecat-auth · ecat-circuit-breaker · ecat-config-remote · ecat-registry(-consul) · ecat-mq-kafka · ecat-scheduler</text>
+  <text x="60" y="758" fill="#64748b">ecat-lock · ecat-data-clickhouse · ecat-middleware · ecat-tracing-otlp · ecat-openapi · ecat-bench · ecat-security · ecat-tls</text>
 </svg>

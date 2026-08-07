@@ -57,6 +57,13 @@ pub async fn record_release(
     Ok(r.last_insert_id() as i64)
 }
 
+pub async fn get_release(pool: &MySqlPool, id: i64) -> sqlx::Result<Option<ReleaseRow>> {
+    sqlx::query_as::<_, ReleaseRow>(&format!("{SELECT_COLS} FROM release WHERE id = ?"))
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+}
+
 pub async fn list_releases(
     pool: &MySqlPool,
     status: Option<&str>,

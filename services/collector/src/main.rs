@@ -99,6 +99,35 @@ async fn main() -> anyhow::Result<()> {
                         }
                     },
                 );
+                let drift_cfg = cfg.clone();
+                sched.lock().unwrap().every(
+                    Duration::from_secs(cfg.drift.interval_secs),
+                    move || {
+                        let cfg = drift_cfg.clone();
+                        async move {
+                            if cfg.drift.enabled
+                                && let Err(e) = superops_collector::drift::drift_once(&cfg).await
+                            {
+                                tracing::warn!("drift check failed: {e}");
+                            }
+                        }
+                    },
+                );
+                let rollback_cfg = cfg.clone();
+                sched.lock().unwrap().every(
+                    Duration::from_secs(cfg.rollback.interval_secs),
+                    move || {
+                        let cfg = rollback_cfg.clone();
+                        async move {
+                            if cfg.rollback.enabled
+                                && let Err(e) =
+                                    superops_collector::rollback::rollback_once(&cfg).await
+                            {
+                                tracing::warn!("auto rollback failed: {e}");
+                            }
+                        }
+                    },
+                );
                 let audit_cfg = cfg.clone();
                 tokio::spawn(async move {
                     if let Err(e) = superops_collector::events::consume_audit(&audit_cfg).await {
