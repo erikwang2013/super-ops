@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1012" font-family="'DejaVu Sans Mono','DejaVu Sans','Menlo',monospace" font-size="12">
-  <rect x="0" y="0" width="1100" height="1012" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 1152" font-family="'DejaVu Sans Mono','DejaVu Sans','Menlo',monospace" font-size="12">
+  <rect x="0" y="0" width="1100" height="1152" fill="#ffffff"/>
   <text x="20" y="30" font-size="18" font-weight="bold" fill="#0f172a" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif">SuperOps 项目结构</text>
   <text x="20" y="50" font-size="12" fill="#64748b" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif">仓库目录树（简化示意，与物理结构一致）；ecat-* 按职责归组展示</text>
 
@@ -11,7 +11,7 @@
   <text x="40" y="140" fill="#334155">├── Makefile</text>
   <text x="520" y="140" fill="#94a3b8">dev / proto / dev-all 一键启动</text>
   <text x="40" y="158" fill="#334155">├── Cargo.toml</text>
-  <text x="520" y="158" fill="#94a3b8">workspace 清单（版本 1.0.2）</text>
+  <text x="520" y="158" fill="#94a3b8">workspace 清单（版本 1.1.6）</text>
   <text x="40" y="176" fill="#334155">├── rust-toolchain.toml</text>
   <text x="520" y="176" fill="#94a3b8">Rust 工具链固定</text>
   <text x="40" y="194" fill="#334155">├── CLAUDE.md / CHANGELOG.md / README.md</text>
@@ -34,64 +34,76 @@
   <text x="40" y="356" fill="#334155">│   │       ├── cmdb_api.rs / logs_api.rs / scripts_api.rs / quota_api.rs /</text>
   <text x="40" y="374" fill="#334155">│   │           chaos_api.rs / release_api.rs</text>
   <text x="520" y="356" fill="#94a3b8">日志检索 / CMDB / 脚本库 / 配额 / 混沌 / 发布回滚</text>
-  <text x="40" y="392" fill="#334155">│   │       └── openapi.rs</text>
+  <text x="40" y="392" fill="#334155">│   │       ├── openapi.rs</text>
   <text x="520" y="392" fill="#94a3b8">/api/docs</text>
-  <text x="40" y="410" fill="#334155">│   ├── k8s/</text>
-  <text x="520" y="410" fill="#94a3b8">K8s 资源服务 :9091（gRPC）</text>
-  <text x="40" y="428" fill="#334155">│   │   └── src/</text>
-  <text x="40" y="446" fill="#334155">│   │       ├── cluster/</text>
-  <text x="520" y="446" fill="#94a3b8">集群管理（kubeconfig）</text>
-  <text x="40" y="464" fill="#334155">│   │       ├── resource/</text>
-  <text x="520" y="464" fill="#94a3b8">pod / deploy / node / exec / job</text>
-  <text x="40" y="482" fill="#334155">│   │       └── service.rs</text>
-  <text x="520" y="482" fill="#94a3b8">tonic：日志 / Watch / exec / RunJob</text>
-  <text x="40" y="500" fill="#334155">│   └── collector/</text>
-  <text x="520" y="500" fill="#94a3b8">指标采集与巡检</text>
-  <text x="40" y="518" fill="#334155">│       └── src/</text>
-  <text x="40" y="536" fill="#334155">│           ├── collect.rs</text>
-  <text x="520" y="536" fill="#94a3b8">周期采集 → ClickHouse</text>
-  <text x="40" y="554" fill="#334155">│           ├── logtail.rs</text>
-  <text x="520" y="554" fill="#94a3b8">Pod 日志周期采集 → ClickHouse</text>
-  <text x="40" y="572" fill="#334155">│           ├── inspect.rs</text>
-  <text x="520" y="572" fill="#94a3b8">巡检（Redis 锁互斥）</text>
-  <text x="40" y="590" fill="#334155">│           ├── alert.rs</text>
-  <text x="520" y="590" fill="#94a3b8">告警写入 + 通知（notify.rs）</text>
-  <text x="40" y="608" fill="#334155">│           └── events.rs / drift.rs / rollback.rs</text>
-  <text x="520" y="608" fill="#94a3b8">Kafka 审计消费 / 配置漂移检测 / 发布自动回滚</text>
-  <text x="40" y="626" fill="#0f172a" font-weight="bold">├── frontend/</text>
-  <text x="520" y="626" fill="#94a3b8">React + Vite + Tauri 2（:3000）</text>
-  <text x="40" y="644" fill="#334155">│   └── src/pages/</text>
-  <text x="520" y="644" fill="#94a3b8">k8s（集群/Pod/终端/日志）+ cmdb + ops（审计/API Keys/用户/脚本/</text>
-  <text x="520" y="662" fill="#94a3b8">告警规则/混沌/配额/发布回滚）</text>
+  <text x="40" y="410" fill="#334155">│   │       ├── cmdb_topology.rs</text>
+  <text x="520" y="410" fill="#94a3b8">资产拓扑 sync/get/explore</text>
+  <text x="40" y="428" fill="#334155">│   │       ├── graphql.rs</text>
+  <text x="520" y="428" fill="#94a3b8">GraphQL /api/graphql（ecat-graphql）</text>
+  <text x="40" y="446" fill="#334155">│   │       └── domain_events.rs</text>
+  <text x="520" y="446" fill="#94a3b8">领域事件消费 → domain_event</text>
+  <text x="40" y="464" fill="#334155">│   ├── k8s/</text>
+  <text x="520" y="464" fill="#94a3b8">K8s 资源服务 :9091（gRPC）</text>
+  <text x="40" y="482" fill="#334155">│   │   └── src/</text>
+  <text x="40" y="500" fill="#334155">│   │       ├── cluster/</text>
+  <text x="520" y="500" fill="#94a3b8">集群管理（kubeconfig）</text>
+  <text x="40" y="518" fill="#334155">│   │       ├── resource/</text>
+  <text x="520" y="518" fill="#94a3b8">pod / deploy / node / exec / job</text>
+  <text x="40" y="536" fill="#334155">│   │       └── service.rs</text>
+  <text x="520" y="536" fill="#94a3b8">tonic：日志 / Watch / exec / RunJob</text>
+  <text x="40" y="554" fill="#334155">│   └── collector/</text>
+  <text x="520" y="554" fill="#94a3b8">指标采集与巡检</text>
+  <text x="40" y="572" fill="#334155">│       └── src/</text>
+  <text x="40" y="590" fill="#334155">│           ├── collect.rs</text>
+  <text x="520" y="590" fill="#94a3b8">周期采集 → ClickHouse</text>
+  <text x="40" y="608" fill="#334155">│           ├── logtail.rs</text>
+  <text x="520" y="608" fill="#94a3b8">Pod 日志周期采集 → ClickHouse</text>
+  <text x="40" y="626" fill="#334155">│           ├── inspect.rs</text>
+  <text x="520" y="626" fill="#94a3b8">巡检（Redis 锁互斥）</text>
+  <text x="40" y="644" fill="#334155">│           ├── alert.rs</text>
+  <text x="520" y="644" fill="#94a3b8">告警写入 + 通知（notify.rs）</text>
+  <text x="40" y="662" fill="#334155">│           ├── events.rs / drift.rs / rollback.rs</text>
+  <text x="520" y="662" fill="#94a3b8">Kafka/MQTT/NATS 审计消费 / 漂移检测 / 自动回滚</text>
+  <text x="40" y="680" fill="#334155">│           ├── domain_events.rs</text>
+  <text x="520" y="680" fill="#94a3b8">领域事件发布（ecat-events）</text>
+  <text x="40" y="698" fill="#334155">│           └── mq.rs</text>
+  <text x="520" y="698" fill="#94a3b8">MQ 装配：mqtt > nats > kafka</text>
+  <text x="40" y="716" fill="#0f172a" font-weight="bold">├── frontend/</text>
+  <text x="520" y="716" fill="#94a3b8">React + Vite + Tauri 2（:3000）</text>
+  <text x="40" y="734" fill="#334155">│   └── src/pages/</text>
+  <text x="520" y="734" fill="#94a3b8">k8s（集群/Pod/终端/日志）+ cmdb（台账/拓扑图）</text>
+  <text x="520" y="752" fill="#94a3b8">+ ops（审计/API Keys/用户/脚本/混沌/配额）</text>
+  <text x="520" y="770" fill="#94a3b8">+ 发布回滚 / 领域事件 / 备份对象）</text>
 
   <!-- ecat 归组 -->
-  <rect x="36" y="666" width="1010" height="188" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
-  <text x="40" y="676" fill="#0f172a" font-weight="bold">├── ecat*（55 个 crate）</text>
-  <text x="520" y="676" fill="#94a3b8">e-cat 框架 workspace 成员</text>
-  <text x="40" y="694" fill="#334155">│   ├── 核心：ecat / ecat-config / ecat-errors / ecat-logging</text>
-  <text x="40" y="712" fill="#334155">│   ├── 认证安全：ecat-auth / ecat-security / ecat-tls</text>
-  <text x="40" y="730" fill="#334155">│   ├── 数据：ecat-data / ecat-data-sqlx / -clickhouse / -redis / -mongodb / …</text>
-  <text x="40" y="748" fill="#334155">│   ├── 消息：ecat-mq / ecat-mq-kafka / -mqtt / -nats / -rabbitmq</text>
-  <text x="40" y="766" fill="#334155">│   ├── 传输：ecat-transport / -http / -grpc / -ws</text>
-  <text x="40" y="784" fill="#334155">│   ├── 注册配置：ecat-registry / -consul / -etcd / ecat-config-remote</text>
-  <text x="40" y="802" fill="#334155">│   ├── 可观测：ecat-tracing / -otlp / ecat-metrics / ecat-health / ecat-events</text>
-  <text x="40" y="820" fill="#334155">│   └── 其他：ecat-scheduler / ecat-lock / ecat-circuit-breaker / ecat-openapi /</text>
-  <text x="40" y="838" fill="#334155">│       ecat-bench / ecat-cli / ecat-client / ecat-deploy / ecat-versioning</text>
+  <rect x="36" y="786" width="1010" height="224" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+  <text x="40" y="796" fill="#0f172a" font-weight="bold">├── ecat*（55 个 crate）</text>
+  <text x="520" y="796" fill="#94a3b8">e-cat 框架 workspace 成员</text>
+  <text x="40" y="814" fill="#334155">│   ├── 核心：ecat / ecat-config / ecat-errors / ecat-logging</text>
+  <text x="40" y="832" fill="#334155">│   ├── 认证安全：ecat-auth / ecat-security / ecat-tls</text>
+  <text x="40" y="850" fill="#334155">│   ├── 数据：ecat-data / ecat-data-sqlx / -clickhouse / -redis / -mongodb / -neo4j /</text>
+  <text x="40" y="868" fill="#334155">│   │       -elasticsearch / -opensearch / -s3</text>
+  <text x="40" y="886" fill="#334155">│   ├── 消息：ecat-mq / ecat-mq-kafka / -mqtt / -nats / -rabbitmq</text>
+  <text x="40" y="904" fill="#334155">│   ├── 传输：ecat-transport / -http / -grpc / -ws</text>
+  <text x="40" y="922" fill="#334155">│   ├── 注册配置：ecat-registry / -consul / -etcd / ecat-config-remote</text>
+  <text x="40" y="940" fill="#334155">│   ├── 可观测：ecat-tracing / -otlp / ecat-metrics / ecat-health / ecat-events</text>
+  <text x="40" y="958" fill="#334155">│   └── 其他：ecat-scheduler / ecat-lock / ecat-circuit-breaker / ecat-openapi /</text>
+  <text x="40" y="976" fill="#334155">│       ecat-bench / ecat-cli / ecat-client / ecat-deploy / ecat-versioning / ecat-graphql</text>
 
-  <text x="40" y="872" fill="#0f172a" font-weight="bold">├── superops-protos/</text>
-  <text x="520" y="872" fill="#94a3b8">protobuf 生成代码（common.v1 / k8s.v1）</text>
-  <text x="40" y="890" fill="#334155">├── protos/</text>
-  <text x="520" y="890" fill="#94a3b8">proto 源文件（buf 管理）</text>
-  <text x="40" y="908" fill="#334155">├── bench/</text>
-  <text x="520" y="908" fill="#94a3b8">ecat-bench 压测入口（health / login）</text>
-  <text x="40" y="926" fill="#334155">├── examples/</text>
-  <text x="520" y="926" fill="#94a3b8">使用示例</text>
-  <text x="40" y="944" fill="#334155">├── config/</text>
-  <text x="520" y="944" fill="#94a3b8">各服务 YAML 配置</text>
-  <text x="40" y="962" fill="#334155">├── deploy/</text>
-  <text x="520" y="962" fill="#94a3b8">docker-compose + init.sql + prometheus.yml</text>
-  <text x="40" y="980" fill="#334155">└── docs/</text>
-  <text x="520" y="980" fill="#94a3b8">审查报告 / 实施计划 / 架构图与图集</text>
+  <text x="40" y="1010" fill="#0f172a" font-weight="bold">├── superops-protos/</text>
+  <text x="520" y="1010" fill="#94a3b8">protobuf 生成代码（common.v1 / k8s.v1）</text>
+  <text x="40" y="1028" fill="#334155">├── protos/</text>
+  <text x="520" y="1028" fill="#94a3b8">proto 源文件（buf 管理）</text>
+  <text x="40" y="1046" fill="#334155">├── bench/</text>
+  <text x="520" y="1046" fill="#94a3b8">ecat-bench 压测入口（health / login）</text>
+  <text x="40" y="1064" fill="#334155">├── examples/</text>
+  <text x="520" y="1064" fill="#94a3b8">使用示例</text>
+  <text x="40" y="1082" fill="#334155">├── config/</text>
+  <text x="520" y="1082" fill="#94a3b8">各服务 YAML 配置</text>
+  <text x="40" y="1100" fill="#334155">├── deploy/</text>
+  <text x="520" y="1100" fill="#94a3b8">docker-compose + init.sql + prometheus.yml</text>
+  <text x="40" y="1118" fill="#334155">└── docs/</text>
+  <text x="520" y="1118" fill="#94a3b8">审查报告 / 实施计划 / 架构图与图集</text>
 
-  <text x="40" y="998" fill="#64748b" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif">注：ecat-* 分类为职责归组示意，实际均为 workspace 根目录下的平级 crate。</text>
+  <text x="40" y="1136" fill="#64748b" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif">注：ecat-* 分类为职责归组示意，实际均为 workspace 根目录下的平级 crate。</text>
 </svg>

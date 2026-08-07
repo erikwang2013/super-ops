@@ -24,6 +24,10 @@ export default function BackupsPage() {
     queryKey: ['backup-summaries'],
     queryFn: () => backupApi.summary(),
   });
+  const { data: objects } = useQuery({
+    queryKey: ['backup-objects'],
+    queryFn: () => backupApi.listObjects(),
+  });
   const sum = summaries?.summaries || [];
   const stale = sum.filter((s: BackupSummaryRow) => s.age_hours > 24);
   const failed = sum.filter((s: BackupSummaryRow) => s.status === 'failed');
@@ -34,6 +38,14 @@ export default function BackupsPage() {
       <Col span={6}><Card><Statistic title="超过 24h 未备份" value={stale.length} valueStyle={{ color: stale.length ? '#faad14' : undefined }} /></Card></Col>
       <Col span={6}><Card><Statistic title="最近失败" value={failed.length} valueStyle={{ color: failed.length ? '#ff4d4f' : undefined }} /></Card></Col>
     </Row>
+    <Card size="small" title={`备份存储对象（${objects?.provider || 's3/minio'}，共 ${objects?.objects.length || 0} 个）`}
+      style={{ marginTop: 16 }}>
+      {objects?.objects.length
+        ? <ul style={{ maxHeight: 160, overflow: 'auto', margin: 0, paddingLeft: 18 }}>
+            {objects.objects.map((o) => <li key={o} style={{ fontFamily: 'monospace', fontSize: 12 }}>{o}</li>)}
+          </ul>
+        : <span style={{ color: '#94a3b8' }}>无对象（gateway.yaml storage 段未配置 S3/MinIO，或桶为空）</span>}
+    </Card>
     <ProTable<BackupStatusRow> rowKey="id" loading={isLoading} search={false}
       style={{ marginTop: 16 }}
       dataSource={statuses?.backups || []} headerTitle="备份状态记录（备份 agent 通过 POST /api/backups/status 上报）"

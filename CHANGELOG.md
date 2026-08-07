@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.8.0] — 2026-08-07 — 生态扩展七连（图拓扑 + ES 检索 + S3 备份 + MQ 多协议 + etcd + GraphQL + 领域事件）
+
+### Added
+- **CMDB 资产拓扑（图数据库）**：gateway `cmdb_topology.rs` —— `POST /api/cmdb/topology/sync`（资产 → 图节点 / depends_on 依赖边 upsert，孤儿节点清理）、`GET /api/cmdb/topology`（节点 + 边查询）、`POST /api/cmdb/topology/explore`（原生图查询，结果上限 4KB）；图后端 provider 抽象（neo4j / nebulagraph / arangodb，gateway.yaml `graph:` 段，未配置时返回明确降级信息）；前端 `/cmdb` 新增「拓扑图」Tab（手写 SVG 圆环布局：资产类型着色条 + 状态描边 + 名称截断 + 同步按钮）
+- **日志检索 ES / OpenSearch**：collector `logtail.rs` 采集时按行索引到搜索后端（collector.yaml `search:` 段，elasticsearch / opensearch，含行号 id 与时间戳字段）；gateway `logs_api.rs` 检索时按配置分流（ClickHouse 或 ES bool / term / match / range DSL），搜索后端不可用自动回退 ClickHouse（503/400 仅告警）
+- **备份存储 S3 / MinIO**：gateway `backup_api.rs` —— `GET /api/backups/objects`（桶内对象键列表，gateway.yaml `storage:` 段配置后可用，ops:cmdb）；前端 `/ops/backups` 页新增「备份存储对象」卡片（provider + 对象键滚动列表）
+- **更多消息协议（MQTT / NATS）**：collector `mq.rs` 多后端装配 —— `mqtt:` / `nats:` 配置段优先，缺省回退 Kafka（`mq:` 段仍为必需）；审计事件消费与领域事件发布共用该后端
+- **etcd 注册中心**：collector `on_start` 支持 etcd 注册（collector.yaml `etcd:` 段，endpoints + `superops/services` 前缀 + 30s lease），未配置时回落 Consul
+- **GraphQL API**：gateway 接入 ecat-graphql（`graphql.rs` schema：`health` / `cmdbStats` / `alerts` / `backups` 查询），挂载 `POST /api/graphql`（api:read）
+- **领域事件（ecat-events）**：collector 告警（alert.rs）/ 配置漂移（drift.rs）/ 自动回滚（rollback.rs）三处经 EventBus 远程总线发布 `DomainEvent`（复用 MQ 后端，`domain_events.rs`）；gateway `domain_events.rs` 消费并落 ClickHouse `domain_event`；`GET /api/events`（ops:audit，event_type 过滤 + limit 钳制）；前端 `/ops/events` 领域事件页（类型过滤 + 级别着色）
+
+### Changed
+- 功能表 / API 一览 / 项目结构 / 已知边界 / 架构图集同步：新增拓扑、检索分流、备份对象、MQ 优先级、etcd、GraphQL、领域事件条目
+- `docs/images/` 7 张 SVG 全部重绘：architecture / design / flow / lifecycle / security / structure / tree —— 新增图库 / 搜索 / 备份存储 / 注册中心 / 事件总线元素；内容多的区域换行并增大画布与盒边界（XML 完整性 + 溢出复验零溢出）
+
+### Verified
+- workspace 测试全过（gateway 107 / collector 57 / k8s 14 / ecat 组件）；`cargo fmt --check` / `cargo clippy --all-targets` 零警告；前端 `tsc` + `npm run build` 全绿
+
 ## [1.7.1] — 2026-08-07 — 修复轮（clippy 零警告 + 前端代码拆分 + 图集修整）
 
 ### Fixed

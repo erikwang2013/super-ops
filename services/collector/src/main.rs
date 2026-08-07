@@ -1,5 +1,6 @@
 use ecat_registry::{Registration, Registry, ServiceInfo};
 use ecat_registry_consul::ConsulRegistry;
+use ecat_registry_etcd::EtcdRegistry;
 use ecat_scheduler::Scheduler;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -30,6 +31,15 @@ async fn main() -> anyhow::Result<()> {
     let reg_holder = Arc::new(Mutex::new(None::<Registration>));
     let reg_start = Arc::clone(&reg_holder);
 
+    let mq = match superops_collector::mq::mq_backend(&cfg).await {
+        Ok(m) => Some(m),
+        Err(e) => {
+            tracing::warn!(error = %e, "mq backend init failed; audit/domain-event consumers disabled");
+            None
+        }
+    };
+    let mq_start = mq.clone();
+
     let mut app = ecat::App::builder()
         .name("superops-collector")
         .version(env!("CARGO_PKG_VERSION"))
@@ -37,8 +47,16 @@ async fn main() -> anyhow::Result<()> {
             let sched = Arc::clone(&sched_start);
             let cfg = cfg_start.clone();
             let reg = Arc::clone(&reg_start);
+            let mq = mq_start.clone();
             async move {
-                if let Some(consul) = &cfg.consul {
+                if let Some(etcd) = &cfg.etcd {
+                    let registry = EtcdRegistry::new(etcd.endpoints.clone(), &etcd.prefix)
+                        .lease_ttl(30);
+                    let info = ServiceInfo::new("superops-collector", env!("CARGO_PKG_VERSION"));
+                    let registration = registry.register(info).await?;
+                    tracing::info!(service = "superops-collector", "registered in etcd");
+                    *reg.lock().unwrap() = Some(registration);
+                } else if let Some(consul) = &cfg.consul {
                     let registry = ConsulRegistry::new(&consul.address);
                     let info = ServiceInfo::new("superops-collector", env!("CARGO_PKG_VERSION"));
                     let registration = registry.register(info).await?;
@@ -129,11 +147,15 @@ async fn main() -> anyhow::Result<()> {
                     },
                 );
                 let audit_cfg = cfg.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = superops_collector::events::consume_audit(&audit_cfg).await {
-                        tracing::warn!("audit consumer stopped: {e}");
-                    }
-                });
+                if let Some(mq) = mq.clone() {
+                    tokio::spawn(async move {
+                        if let Err(e) =
+                            superops_collector::events::consume_audit(mq, &audit_cfg).await
+                        {
+                            tracing::warn!("audit consumer stopped: {e}");
+                        }
+                    });
+                }
                 Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
             }
         })

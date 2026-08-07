@@ -52,11 +52,75 @@ fn build_where(q: &LogSearchQuery) -> Vec<String> {
     w
 }
 
+fn fmt_ts(unix: i64) -> String {
+    chrono::DateTime::from_timestamp(unix, 0)
+        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+        .unwrap_or_default()
+}
+
 pub async fn search_logs(
     State(state): State<crate::AppState>,
     Query(q): Query<LogSearchQuery>,
 ) -> impl IntoResponse {
     let limit = clamp_limit(&q);
+    // 日志检索后端：search 段配置时走 ES/OpenSearch，否则走 ClickHouse pod_log
+    if let Some(search) = &state.search {
+        let mut must: Vec<serde_json::Value> = Vec::new();
+        if let Some(ns) = q.namespace.as_deref().filter(|s| !s.is_empty()) {
+            must.push(serde_json::json!({ "term": { "namespace": ns } }));
+        }
+        if let Some(p) = q.pod.as_deref().filter(|s| !s.is_empty()) {
+            must.push(serde_json::json!({ "term": { "pod": p } }));
+        }
+        if let Some(k) = q.keyword.as_deref().filter(|s| !s.is_empty()) {
+            must.push(serde_json::json!({ "match": { "content": k } }));
+        }
+        let mut range = serde_json::Map::new();
+        if let Some(f) = q.from {
+            range.insert("gte".into(), serde_json::json!(f));
+        }
+        if let Some(t) = q.to {
+            range.insert("lte".into(), serde_json::json!(t));
+        }
+        if !range.is_empty() {
+            must.push(serde_json::json!({ "range": { "timestamp": range } }));
+        }
+        let query = serde_json::json!({
+            "query": { "bool": { "must": must } },
+            "sort": [{ "timestamp": { "order": "desc" } }],
+            "size": limit,
+        });
+        return match search.search(&state.search_index, &query).await {
+            Ok(resp) => {
+                let logs: Vec<serde_json::Value> = resp
+                    .pointer("/hits/hits")
+                    .and_then(serde_json::Value::as_array)
+                    .map(|hits| {
+                        hits.iter()
+                            .filter_map(|h| h.get("_source").cloned())
+                            .map(|mut src| {
+                                let ts = src
+                                    .get("timestamp")
+                                    .and_then(serde_json::Value::as_i64)
+                                    .map(fmt_ts)
+                                    .unwrap_or_default();
+                                if let Some(o) = src.as_object_mut() {
+                                    o.insert("ts".into(), serde_json::json!(ts));
+                                }
+                                src
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                (StatusCode::OK, Json(serde_json::json!({ "logs": logs }))).into_response()
+            }
+            Err(e) => (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": format!("log search failed: {e}") })),
+            )
+                .into_response(),
+        };
+    }
     let where_sql = build_where(&q);
     let sql = if where_sql.is_empty() {
         format!(

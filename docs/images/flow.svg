@@ -72,14 +72,17 @@
   <rect x="60" y="575" width="980" height="110" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
   <rect x="60" y="575" width="980" height="30" rx="8" fill="#0f172a"/>
   <rect x="60" y="590" width="980" height="15" fill="#0f172a"/>
-  <text x="80" y="595" font-weight="bold" fill="#ffffff">⑦ 数据与可观测闭环</text>
-  <rect x="80" y="615" width="290" height="52" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.2"/>
-  <text x="225" y="637" text-anchor="middle" fill="#334155">审计事件 → Kafka superops.audit</text>
-  <text x="225" y="655" text-anchor="middle" fill="#94a3b8">collector 消费 → ClickHouse audit_log</text>
-  <rect x="400" y="615" width="290" height="52" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.2"/>
-  <text x="545" y="637" text-anchor="middle" fill="#334155">周期采集 → ClickHouse 快照</text>
-  <text x="545" y="655" text-anchor="middle" fill="#94a3b8">巡检告警 → alert_event</text>
-  <rect x="720" y="615" width="300" height="52" rx="6" fill="#ffffff" stroke="#0891b2" stroke-width="1.2"/>
-  <text x="870" y="637" text-anchor="middle" fill="#334155">可观测：/metrics + OTLP span</text>
-  <text x="870" y="655" text-anchor="middle" fill="#94a3b8">Prometheus 抓取 / Jaeger 展示</text>
+  <text x="80" y="595" font-weight="bold" fill="#ffffff">⑦ 数据与领域事件闭环</text>
+  <rect x="80" y="615" width="230" height="52" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.2"/>
+  <text x="195" y="637" text-anchor="middle" fill="#334155">审计事件 → Kafka</text>
+  <text x="195" y="655" text-anchor="middle" fill="#94a3b8">collector 消费 → audit_log</text>
+  <rect x="320" y="615" width="230" height="52" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.2"/>
+  <text x="435" y="637" text-anchor="middle" fill="#334155">周期采集 → 快照</text>
+  <text x="435" y="655" text-anchor="middle" fill="#94a3b8">巡检告警 → alert_event</text>
+  <rect x="560" y="615" width="230" height="52" rx="6" fill="#ffffff" stroke="#ea580c" stroke-width="1.2"/>
+  <text x="675" y="637" text-anchor="middle" fill="#334155">日志双写：ClickHouse + ES</text>
+  <text x="675" y="655" text-anchor="middle" fill="#94a3b8">检索分流（可选后端）</text>
+  <rect x="800" y="615" width="230" height="52" rx="6" fill="#ffffff" stroke="#0891b2" stroke-width="1.2"/>
+  <text x="915" y="637" text-anchor="middle" fill="#334155">领域事件发布（ecat-events）</text>
+  <text x="915" y="655" text-anchor="middle" fill="#94a3b8">collector 发布 → gateway 消费</text>
 </svg>

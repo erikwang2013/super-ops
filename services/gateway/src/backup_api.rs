@@ -91,3 +91,28 @@ pub async fn backup_summary_handler(State(state): State<crate::AppState>) -> imp
             .into_response(),
     }
 }
+
+/// S3/MinIO 备份对象列表（gateway.yaml storage 段配置后可用）。
+pub async fn list_backup_objects_handler(
+    State(state): State<crate::AppState>,
+) -> impl IntoResponse {
+    let Some(storage) = &state.storage else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({ "error": "storage 未配置（gateway.yaml storage 段）" })),
+        )
+            .into_response();
+    };
+    match storage.list("superops-backups", "").await {
+        Ok(objects) => (
+            StatusCode::OK,
+            Json(serde_json::json!({ "objects": objects, "provider": "s3" })),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({ "error": format!("s3 list failed: {e}") })),
+        )
+            .into_response(),
+    }
+}

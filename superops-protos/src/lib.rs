@@ -9,3 +9,5 @@ pub mod k8s {
         tonic::include_proto!("k8s.v1");
     }
 }
+
+pub mod events;

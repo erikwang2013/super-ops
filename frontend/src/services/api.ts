@@ -69,6 +69,26 @@ export const cmdbApi = {
   getCmdbStats: () => api.get<CmdbStats>('/cmdb/stats'),
 };
 
+export interface TopoNode {
+  key: string; asset_type: string; name: string;
+  ip?: string; env: string; owner: string; status: string;
+}
+export interface TopoEdge { src: string; dst: string; }
+export interface TopologyData { provider: string; nodes: TopoNode[]; edges: TopoEdge[]; }
+
+export const topologyApi = {
+  get: () => api.get<TopologyData>('/cmdb/topology'),
+  sync: () => api.post<{ synced: number; edges: number; provider: string }>('/cmdb/topology/sync', {}),
+};
+
+export interface DomainEventRow {
+  event_type: string; level: string; title: string; message: string; ts: string;
+}
+export const eventApi = {
+  list: (limit = 100, eventType?: string) =>
+    api.get<{ events: DomainEventRow[] }>(`/events?limit=${limit}&event_type=${eventType || ''}`),
+};
+
 export interface QuotaRow {
   id: number;
   cluster_id: string;
@@ -336,6 +356,7 @@ export interface BackupSummaryRow {
 export const backupApi = {
   listStatus: (limit = 50) => api.get<{ backups: BackupStatusRow[] }>(`/backups/status?limit=${limit}`),
   summary: () => api.get<{ summaries: BackupSummaryRow[] }>('/backups/summary'),
+  listObjects: () => api.get<{ objects: string[]; provider: string }>('/backups/objects'),
 };
 
 export interface ConfigKeyRow { key: string; value: string; modified_index: number; }

@@ -4,7 +4,6 @@ use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
 };
-use ecat_mq::MessageQueue;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]

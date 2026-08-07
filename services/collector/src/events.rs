@@ -2,9 +2,9 @@ use crate::ch::clickhouse_from;
 use crate::config::Config;
 use ecat_data::{DataPoint, FieldValue};
 use ecat_mq::MessageQueue;
-use ecat_mq_kafka::KafkaMq;
 use futures::future::poll_fn;
 use serde::Deserialize;
+use std::sync::Arc;
 
 const AUDIT_TOPIC: &str = "superops.audit";
 
@@ -37,14 +37,11 @@ pub fn audit_to_data_point(e: &AuditEvent) -> DataPoint {
         })
 }
 
-pub async fn consume_audit(cfg: &Config) -> anyhow::Result<()> {
-    let mq = KafkaMq::from_config(cfg.mq.clone())
-        .await
-        .map_err(|e| anyhow::anyhow!("kafka config: {e}"))?;
+pub async fn consume_audit(mq: Arc<dyn MessageQueue>, cfg: &Config) -> anyhow::Result<()> {
     let mut stream = mq
         .subscribe(AUDIT_TOPIC)
         .await
-        .map_err(|e| anyhow::anyhow!("kafka subscribe: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("mq subscribe: {e}"))?;
     let ch = clickhouse_from(cfg)?;
     while let Some(msg) = poll_fn(|cx| stream.poll_recv(cx)).await {
         match msg {

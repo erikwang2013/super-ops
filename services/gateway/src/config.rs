@@ -1,6 +1,9 @@
 use anyhow::Result;
 use ecat_data_clickhouse::ClickhouseConfig;
+use ecat_data_s3::S3Config;
 use ecat_mq_kafka::KafkaConfig;
+use ecat_mq_mqtt::MqttConfig;
+use ecat_mq_nats::NatsConfig;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -14,7 +17,13 @@ pub struct Config {
     #[serde(default)]
     pub mq: Option<KafkaConfig>,
     #[serde(default)]
+    pub mqtt: Option<MqttConfig>,
+    #[serde(default)]
+    pub nats: Option<NatsConfig>,
+    #[serde(default)]
     pub consul: Option<ConsulConfig>,
+    #[serde(default)]
+    pub etcd: Option<EtcdConfig>,
     #[serde(default)]
     pub otlp: Option<String>,
     #[serde(default)]
@@ -25,6 +34,74 @@ pub struct Config {
     pub recording: RecordingConfig,
     #[serde(default)]
     pub terminal: TerminalConfig,
+    #[serde(default)]
+    pub graph: Option<GraphConfig>,
+    #[serde(default)]
+    pub search: Option<SearchConfig>,
+    #[serde(default)]
+    pub storage: Option<S3Config>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ConsulConfig {
+    pub address: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct EtcdConfig {
+    pub endpoints: Vec<String>,
+    #[serde(default = "default_etcd_prefix")]
+    pub prefix: String,
+}
+
+fn default_etcd_prefix() -> String {
+    "/superops/services".into()
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct GraphConfig {
+    #[serde(default = "default_graph_provider")]
+    pub provider: String, // neo4j | nebulagraph | arangodb
+    pub base_url: String,
+    pub username: String,
+    pub password: String,
+    #[serde(default = "default_graph_space")]
+    pub space: String, // nebulagraph space / arangodb db
+}
+
+fn default_graph_provider() -> String {
+    "neo4j".into()
+}
+
+fn default_graph_space() -> String {
+    "superops".into()
+}
+
+impl GraphConfig {
+    pub fn is_neo4j(&self) -> bool {
+        self.provider == "neo4j"
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct SearchConfig {
+    #[serde(default = "default_search_provider")]
+    pub provider: String, // elasticsearch | opensearch
+    pub base_url: String,
+    #[serde(default)]
+    pub username: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
+    #[serde(default = "default_search_index")]
+    pub index: String,
+}
+
+fn default_search_provider() -> String {
+    "elasticsearch".into()
+}
+
+fn default_search_index() -> String {
+    "superops-logs".into()
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -99,11 +176,6 @@ pub struct ServicesConfig {
 pub struct K8sServiceConfig {
     #[allow(dead_code)]
     pub endpoint: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct ConsulConfig {
-    pub address: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

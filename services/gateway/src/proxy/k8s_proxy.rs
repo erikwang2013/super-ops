@@ -4,7 +4,6 @@ use axum::{
     http::{HeaderMap, StatusCode},
 };
 use ecat_auth::AuthClaims;
-use ecat_mq::MessageQueue;
 use futures::StreamExt;
 use serde::Deserialize;
 

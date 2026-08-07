@@ -67,7 +67,10 @@ struct GqlReq {
     variables: serde_json::Value,
 }
 
-pub fn graphql_router(schema: GraphQLSchema) -> Router {
+pub fn graphql_router<S>(schema: GraphQLSchema) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
     let schema = Arc::new(schema);
 
     async fn handler(axum::Json(req): axum::Json<GqlReq>, schema: Arc<GraphQLSchema>) -> Response {
@@ -146,6 +149,6 @@ mod tests {
         let schema = GraphQLSchema::new().query_fn("ping", |_vars| {
             Box::pin(async { Ok(serde_json::json!("pong")) })
         });
-        let _router = graphql_router(schema);
+        let _router: axum::Router<()> = graphql_router(schema);
     }
 }

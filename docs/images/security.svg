@@ -1,11 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 760" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 770" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif" font-size="13">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#64748b"/>
     </marker>
   </defs>
 
-  <rect x="0" y="0" width="1100" height="760" fill="#ffffff"/>
+  <rect x="0" y="0" width="1100" height="770" fill="#ffffff"/>
   <text x="20" y="30" font-size="18" font-weight="bold" fill="#0f172a">SuperOps 安全防护</text>
   <text x="20" y="50" font-size="12" fill="#64748b">七道防线 + WAF 兜底 + 熔断兜底；Phase 1 安全审查发现的问题已全部修复并重新验证</text>
 
@@ -70,8 +70,9 @@
   <text x="80" y="616" fill="#334155">· 半开探针自动探测 · 上游恢复后放行</text>
 
   <!-- 验证 -->
-  <rect x="60" y="670" width="980" height="70" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+  <rect x="60" y="670" width="980" height="88" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
   <text x="80" y="694" font-weight="bold" fill="#1e40af">已修复并重新验证（Phase 1 安全审查 + WAF 层新增测试）</text>
   <text x="80" y="718" fill="#334155">· 无 token → 401 · 伪造 / 篡改 token → 401 · 合法 token → 200 · 爆破 401×9 → 429×3</text>
   <text x="80" y="736" fill="#334155">· SQLi / XSS body、header 注入 → 403（WAF 4 项新测试全过）</text>
+  <text x="80" y="754" fill="#334155">· GraphQL / 领域事件 / 拓扑等新 API 走同一 WAF + 认证链（api:read / ops:cmdb / ops:audit）</text>
 </svg>

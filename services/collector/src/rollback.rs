@@ -114,6 +114,23 @@ pub async fn rollback_once(cfg: &Config) -> anyhow::Result<()> {
                 .await;
                 rolled += 1;
                 tracing::warn!(deployment = %t.name, image = %t.old_image, "auto rollback triggered");
+                // 领域事件：自动回滚广播到事件总线（gateway 端落 ClickHouse domain_event）
+                let event = superops_protos::events::DomainEvent::new(
+                    "rollback",
+                    "WARN",
+                    "auto-rollback",
+                    format!("deployment {} 回滚到 {}", t.name, t.old_image),
+                )
+                .with_detail(serde_json::json!({
+                    "cluster_id": t.cluster_id,
+                    "namespace": t.namespace,
+                    "deployment": t.name,
+                    "image": t.old_image,
+                }))
+                .with_ts(crate::ch::now_secs());
+                if let Err(e) = crate::domain_events::publish_domain_event(cfg, &event).await {
+                    tracing::warn!("rollback domain event publish failed: {e}");
+                }
             }
             Err(e) => {
                 tracing::warn!(deployment = %t.name, error = %e, "auto rollback update failed")

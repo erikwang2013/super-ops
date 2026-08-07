@@ -8,13 +8,17 @@ mod breaker;
 mod capacity_api;
 mod chaos_api;
 mod cmdb_api;
+mod cmdb_topology;
 mod config;
 mod config_remote;
+mod domain_events;
 mod files_api;
+mod graphql;
 mod health;
 mod logs_api;
 mod metrics;
 mod metrics_api;
+mod mq;
 mod model;
 mod oncall_api;
 mod openapi;
@@ -41,11 +45,13 @@ use crate::config::Config;
 use crate::model::user::UserStore;
 use ecat::App;
 use ecat_config_remote::ConsulConfigSource;
+use ecat_data::{GraphClient, SearchClient, StorageClient};
 use ecat_data_clickhouse::ClickhouseClient;
 use ecat_middleware::{MemoryStore, RateLimitStore, RedisRateLimitStore};
-use ecat_mq_kafka::KafkaMq;
+use ecat_mq::MessageQueue;
 use ecat_registry::{Registration, Registry, ServiceInfo};
 use ecat_registry_consul::ConsulRegistry;
+use ecat_registry_etcd::EtcdRegistry;
 use ecat_transport_http::HttpServer;
 use sqlx::mysql::{MySqlConnectOptions, MySqlPool, MySqlPoolOptions, MySqlSslMode};
 use std::sync::{Arc, Mutex, RwLock};
@@ -56,7 +62,13 @@ pub struct AppState {
     pub auth: Arc<AuthState>,
     pub ch: Arc<ClickhouseClient>,
     pub alert_acks: Arc<crate::alerts_api::AlertAckStore>,
-    pub mq: Option<Arc<KafkaMq>>,
+    pub mq: Option<Arc<dyn MessageQueue>>,
+    pub graph: Option<Arc<dyn GraphClient>>,
+    pub graph_provider: String,
+    pub graph_is_neo4j: bool,
+    pub search: Option<Arc<dyn SearchClient>>,
+    pub search_index: String,
+    pub storage: Option<Arc<dyn StorageClient>>,
     pub k8s_endpoint: Arc<RwLock<String>>,
     pub api_keys: Arc<crate::model::api_key::ApiKeyStore>,
     pub pool: MySqlPool,
@@ -65,6 +77,7 @@ pub struct AppState {
     pub recording_enabled: bool,
     pub terminal: crate::config::TerminalConfig,
     pub consul: Option<String>,
+    pub etcd: Option<String>,
 }
 
 async fn mysql_pool(config: &Config) -> anyhow::Result<MySqlPool> {
@@ -124,11 +137,82 @@ async fn main() -> anyhow::Result<()> {
         ClickhouseClient::from_config(config.ch.clone())
             .map_err(|e| anyhow::anyhow!("clickhouse config: {e}"))?,
     );
-    let mq = match &config.mq {
+    let mq = crate::mq::mq_backend(&config).await?;
+    let graph: Option<Arc<dyn GraphClient>> = match &config.graph {
+        Some(g) => {
+            let client: Arc<dyn GraphClient> = match g.provider.as_str() {
+                "neo4j" => Arc::new(
+                    ecat_data_neo4j::Neo4jClient::from_config(ecat_data_neo4j::Neo4jConfig {
+                        base_url: g.base_url.clone(),
+                        username: g.username.clone(),
+                        password: g.password.clone(),
+                        tls: None,
+                    })
+                    .map_err(|e| anyhow::anyhow!("neo4j config: {e}"))?,
+                ),
+                "nebulagraph" => Arc::new(
+                    ecat_data_nebulagraph::NebulaGraphClient::from_config(
+                        ecat_data_nebulagraph::NebulaGraphConfig {
+                            base_url: g.base_url.clone(),
+                            space: g.space.clone(),
+                            username: Some(g.username.clone()),
+                            password: Some(g.password.clone()),
+                            tls: None,
+                        },
+                    )
+                    .map_err(|e| anyhow::anyhow!("nebulagraph config: {e}"))?,
+                ),
+                "arangodb" => Arc::new(
+                    ecat_data_arangodb::ArangoClient::from_config(ecat_data_arangodb::ArangoConfig {
+                        base_url: g.base_url.clone(),
+                        db: g.space.clone(),
+                        username: g.username.clone(),
+                        password: g.password.clone(),
+                        tls: None,
+                    })
+                    .map_err(|e| anyhow::anyhow!("arangodb config: {e}"))?,
+                ),
+                other => anyhow::bail!("unsupported graph provider: {other}"),
+            };
+            Some(client)
+        }
+        None => None,
+    };
+    let search: Option<Arc<dyn SearchClient>> = match &config.search {
+        Some(s) => {
+            let client: Arc<dyn SearchClient> = match s.provider.as_str() {
+                "elasticsearch" => Arc::new(
+                    ecat_data_elasticsearch::ElasticsearchClient::from_config(
+                        ecat_data_elasticsearch::ElasticsearchConfig {
+                            base_url: s.base_url.clone(),
+                            username: s.username.clone(),
+                            password: s.password.clone(),
+                            tls: None,
+                        },
+                    )
+                    .map_err(|e| anyhow::anyhow!("elasticsearch config: {e}"))?,
+                ),
+                "opensearch" => Arc::new(
+                    ecat_data_opensearch::OpenSearchClient::from_config(
+                        ecat_data_opensearch::OpenSearchConfig {
+                            base_url: s.base_url.clone(),
+                            username: s.username.clone(),
+                            password: s.password.clone(),
+                            tls: None,
+                        },
+                    )
+                    .map_err(|e| anyhow::anyhow!("opensearch config: {e}"))?,
+                ),
+                other => anyhow::bail!("unsupported search provider: {other}"),
+            };
+            Some(client)
+        }
+        None => None,
+    };
+    let storage: Option<Arc<dyn StorageClient>> = match &config.storage {
         Some(cfg) => Some(Arc::new(
-            KafkaMq::from_config(cfg.clone())
-                .await
-                .map_err(|e| anyhow::anyhow!("kafka config: {e}"))?,
+            ecat_data_s3::S3Client::from_config(cfg.clone())
+                .map_err(|e| anyhow::anyhow!("s3 config: {e}"))?,
         )),
         None => None,
     };
@@ -144,6 +228,20 @@ async fn main() -> anyhow::Result<()> {
         ch,
         alert_acks,
         mq,
+        graph_provider: config
+            .graph
+            .as_ref()
+            .map(|g| g.provider.clone())
+            .unwrap_or_else(|| "neo4j".into()),
+        graph_is_neo4j: config.graph.as_ref().is_some_and(|g| g.is_neo4j()),
+        graph,
+        search,
+        search_index: config
+            .search
+            .as_ref()
+            .map(|s| s.index.clone())
+            .unwrap_or_else(|| "superops-logs".into()),
+        storage,
         k8s_endpoint: Arc::new(RwLock::new(config.services.k8s.endpoint.clone())),
         api_keys: Arc::new(crate::model::api_key::ApiKeyStore::new(pool.clone())),
         pool: pool.clone(),
@@ -152,6 +250,7 @@ async fn main() -> anyhow::Result<()> {
         recording_enabled: config.recording.enabled,
         terminal: config.terminal.clone(),
         consul: config.consul.as_ref().map(|c| c.address.clone()),
+        etcd: config.etcd.as_ref().map(|e| e.endpoints.join(",")),
     };
     let api_keys = Arc::clone(&state.api_keys);
     tokio::spawn(async move {
@@ -159,6 +258,14 @@ async fn main() -> anyhow::Result<()> {
             tracing::warn!(error = %e, "api_keys load failed; run deploy/init.sql");
         }
     });
+    if let Some(mq) = state.mq.clone() {
+        let ch = Arc::clone(&state.ch);
+        tokio::spawn(async move {
+            if let Err(e) = crate::domain_events::consume_domain_events(mq, ch).await {
+                tracing::warn!(error = %e, "domain event consumer stopped");
+            }
+        });
+    }
     // 上传目录不可创建时仅告警：文件上传不可用但服务照常启动
     if let Err(e) = tokio::fs::create_dir_all("data/uploads").await {
         tracing::warn!(error = %e, "cannot create data/uploads; file upload disabled");
@@ -217,6 +324,34 @@ async fn main() -> anyhow::Result<()> {
                         source.watch(),
                         dynamic,
                     ));
+                }
+                if let Some(etcd) = &cfg.etcd {
+                    let registry = EtcdRegistry::new(etcd.endpoints.clone(), &etcd.prefix)
+                        .lease_ttl(30);
+                    let info = ServiceInfo::new("superops-gateway", env!("CARGO_PKG_VERSION"))
+                        .with_endpoint(format!("http://localhost:{}", cfg.server.http_port));
+                    let registration = registry.register(info).await?;
+                    tracing::info!(service = "superops-gateway", "registered in etcd");
+                    *reg.lock().unwrap() = Some(registration);
+
+                    match registry.discover("superops-k8s").await {
+                        Ok(discovered) => {
+                            let endpoint = crate::registry::resolve_k8s_endpoint(
+                                &discovered,
+                                &cfg.services.k8s.endpoint,
+                            );
+                            tracing::info!(
+                                endpoint = %endpoint,
+                                source = if discovered.is_empty() { "static" } else { "etcd" },
+                                "resolved k8s backend"
+                            );
+                            *state.k8s_endpoint.write().unwrap() = endpoint;
+                        }
+                        Err(e) => tracing::warn!(
+                            error = %e,
+                            "k8s discovery failed; keeping static endpoint"
+                        ),
+                    }
                 }
                 Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
             }

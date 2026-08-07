@@ -1,6 +1,7 @@
 use crate::ch::{clickhouse_from, now_secs};
 use crate::config::Config;
 use ecat_data::{DataPoint, FieldValue, TsdbClient};
+use std::sync::Arc;
 use superops_protos::k8s::v1::k8s_service_client::K8sServiceClient;
 use superops_protos::k8s::v1::{GetPodLogsRequest, ListPodsRequest};
 
@@ -35,6 +36,38 @@ pub async fn collect_once(cfg: &Config) -> anyhow::Result<()> {
     }
     let mut client = K8sServiceClient::connect(cfg.k8s.endpoint.clone()).await?;
     let ch = clickhouse_from(cfg)?;
+    // 日志检索后端：search 段配置时，同一批日志同时索引到 ES/OpenSearch
+    let search_client: Option<(Arc<dyn ecat_data::SearchClient>, String)> =
+        match &cfg.search {
+            Some(s) => {
+                let client: Arc<dyn ecat_data::SearchClient> = match s.provider.as_str() {
+                    "opensearch" => Arc::new(
+                        ecat_data_opensearch::OpenSearchClient::from_config(
+                            ecat_data_opensearch::OpenSearchConfig {
+                                base_url: s.base_url.clone(),
+                                username: s.username.clone(),
+                                password: s.password.clone(),
+                                tls: None,
+                            },
+                        )
+                        .map_err(|e| anyhow::anyhow!("opensearch config: {e}"))?,
+                    ),
+                    _ => Arc::new(
+                        ecat_data_elasticsearch::ElasticsearchClient::from_config(
+                            ecat_data_elasticsearch::ElasticsearchConfig {
+                                base_url: s.base_url.clone(),
+                                username: s.username.clone(),
+                                password: s.password.clone(),
+                                tls: None,
+                            },
+                        )
+                        .map_err(|e| anyhow::anyhow!("elasticsearch config: {e}"))?,
+                    ),
+                };
+                Some((client, s.index.clone()))
+            }
+            None => None,
+        };
     for ns in &cfg.logtail.namespaces {
         let pods = client
             .list_pods(ListPodsRequest {
@@ -88,6 +121,21 @@ pub async fn collect_once(cfg: &Config) -> anyhow::Result<()> {
                 .collect();
             if !points.is_empty() {
                 TsdbClient::write(ch.as_ref(), &points).await?;
+                if let Some((search, index)) = &search_client {
+                    let ts = now_secs();
+                    for (i, content) in lines.iter().enumerate() {
+                        let id = format!("{ns}/{}/{ts}-{i}", pod.name);
+                        let doc = serde_json::json!({
+                            "namespace": ns,
+                            "pod": pod.name,
+                            "content": truncate_line(content, cfg.logtail.max_line_bytes as usize),
+                            "timestamp": ts,
+                        });
+                        if let Err(e) = search.index(index, &id, &doc).await {
+                            tracing::warn!("log search index {id} failed: {e}");
+                        }
+                    }
+                }
             }
         }
     }

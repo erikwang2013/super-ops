@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 860" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1260 1000" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif" font-size="13">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#64748b"/>
@@ -8,9 +8,9 @@
     </marker>
   </defs>
 
-  <rect x="0" y="0" width="1100" height="860" fill="#ffffff"/>
+  <rect x="0" y="0" width="1260" height="1000" fill="#ffffff"/>
   <text x="20" y="30" font-size="18" font-weight="bold" fill="#0f172a">SuperOps 分层设计</text>
-  <text x="20" y="50" font-size="12" fill="#64748b">展示层 → 接入层 → 服务层 → 数据层 → 可观测；e-cat 框架组件贯穿各层</text>
+  <text x="20" y="50" font-size="12" fill="#64748b">展示层 → 接入层 → 服务层 → 数据层 → 可观测；e-cat 框架组件贯穿各层（虚线框 = 可选后端）</text>
 
   <!-- 展示层 -->
   <rect x="430" y="70" width="240" height="58" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
@@ -20,9 +20,9 @@
   <text x="560" y="152" fill="#64748b" font-size="12">HTTP / WebSocket</text>
 
   <!-- 接入层 -->
-  <rect x="60" y="170" width="980" height="120" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
-  <rect x="60" y="170" width="980" height="30" rx="8" fill="#0f172a"/>
-  <rect x="60" y="185" width="980" height="15" fill="#0f172a"/>
+  <rect x="60" y="170" width="1220" height="120" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="60" y="170" width="1220" height="30" rx="8" fill="#0f172a"/>
+  <rect x="60" y="185" width="1220" height="15" fill="#0f172a"/>
   <text x="80" y="190" font-weight="bold" fill="#ffffff">接入层 · Gateway :8080（HTTP / WS）+ :9090（gRPC）</text>
   <rect x="80" y="210" width="120" height="80" rx="6" fill="#fef2f2" stroke="#dc2626" stroke-width="1.2"/>
   <text x="140" y="230" text-anchor="middle" fill="#b91c1c">WAF 扫描</text>
@@ -44,15 +44,19 @@
   <rect x="628" y="210" width="120" height="64" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.2"/>
   <text x="688" y="230" text-anchor="middle" fill="#334155">配置热更新</text>
   <text x="688" y="248" text-anchor="middle" fill="#94a3b8">Consul KV</text>
-  <text x="688" y="264" text-anchor="middle" fill="#94a3b8">阻塞查询</text>
+  <text x="688" y="264" text-anchor="middle" fill="#94a3b8">etcd KV（可选）</text>
   <rect x="765" y="210" width="120" height="64" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.2"/>
   <text x="825" y="230" text-anchor="middle" fill="#334155">gRPC 代理</text>
   <text x="825" y="248" text-anchor="middle" fill="#94a3b8">HTTP ↔ :9091</text>
   <text x="825" y="264" text-anchor="middle" fill="#94a3b8">WS 终端桥</text>
-  <rect x="902" y="210" width="138" height="64" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.2"/>
-  <text x="971" y="230" text-anchor="middle" fill="#334155">可观测</text>
-  <text x="971" y="248" text-anchor="middle" fill="#94a3b8">/metrics</text>
-  <text x="971" y="264" text-anchor="middle" fill="#94a3b8">OTLP</text>
+  <rect x="902" y="210" width="120" height="64" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.2"/>
+  <text x="962" y="230" text-anchor="middle" fill="#334155">可观测</text>
+  <text x="962" y="248" text-anchor="middle" fill="#94a3b8">/metrics</text>
+  <text x="962" y="264" text-anchor="middle" fill="#94a3b8">OTLP</text>
+  <rect x="1039" y="210" width="120" height="64" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.2"/>
+  <text x="1099" y="230" text-anchor="middle" fill="#334155">GraphQL API</text>
+  <text x="1099" y="248" text-anchor="middle" fill="#94a3b8">ecat-graphql</text>
+  <text x="1099" y="264" text-anchor="middle" fill="#94a3b8">/api/graphql</text>
   <path d="M 340 290 L 340 320" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
   <path d="M 760 290 L 760 320" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
   <text x="350" y="312" fill="#64748b" font-size="12">gRPC</text>
@@ -66,65 +70,83 @@
   <text x="80" y="392" fill="#334155">· Pod / Deployment / Node 查询与 Watch</text>
   <text x="80" y="412" fill="#334155">· 日志流（tail + follow）</text>
   <text x="80" y="432" fill="#334155">· exec 双向流（stdin/stdout/stderr + resize）</text>
-  <rect x="560" y="320" width="480" height="150" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
-  <rect x="560" y="320" width="480" height="30" rx="8" fill="#0f172a"/>
-  <rect x="560" y="335" width="480" height="15" fill="#0f172a"/>
+  <rect x="560" y="320" width="720" height="190" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="560" y="320" width="720" height="30" rx="8" fill="#0f172a"/>
+  <rect x="560" y="335" width="720" height="15" fill="#0f172a"/>
   <text x="580" y="340" font-weight="bold" fill="#ffffff">服务层 · Collector</text>
   <text x="580" y="372" fill="#334155">· 周期采集（interval 可配）→ ClickHouse 快照</text>
-  <text x="580" y="392" fill="#334155">· 巡检告警（连续 N 次超标 → alert_event）</text>
-  <text x="580" y="412" fill="#334155">· Kafka 审计事件消费（superops.audit）</text>
-  <text x="580" y="432" fill="#334155">· Redis 分布式锁互斥巡检</text>
-  <text x="580" y="452" fill="#334155">· 配置漂移检测 + 发布自动回滚（drift / rollback）</text>
-  <path d="M 340 450 L 340 490" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
-  <path d="M 760 470 L 760 490" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <text x="580" y="392" fill="#334155">· 日志检索双写：ClickHouse + ES 分流</text>
+  <text x="580" y="412" fill="#334155">· 巡检告警（连续 N 次超标 → alert_event）</text>
+  <text x="580" y="432" fill="#334155">· 领域事件发布（ecat-events，MQ 复用）</text>
+  <text x="580" y="452" fill="#334155">· MQ 消费：mqtt > nats > kafka 优先级</text>
+  <text x="580" y="472" fill="#334155">· Kafka 审计事件消费（superops.audit）</text>
+  <text x="580" y="492" fill="#334155">· 配置漂移检测 + 发布自动回滚（drift / rollback）</text>
+  <path d="M 340 450 L 340 530" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 800 510 L 800 530" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
 
   <!-- 数据层 -->
-  <rect x="60" y="490" width="980" height="160" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
-  <rect x="60" y="490" width="980" height="30" rx="8" fill="#0f172a"/>
-  <rect x="60" y="505" width="980" height="15" fill="#0f172a"/>
-  <text x="80" y="510" font-weight="bold" fill="#ffffff">数据层</text>
-  <rect x="80" y="535" width="150" height="100" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.2"/>
-  <text x="155" y="558" text-anchor="middle" font-weight="bold" fill="#92400e">MySQL 8 :3307</text>
-  <text x="155" y="578" text-anchor="middle" fill="#92400e">用户 / API Key</text>
-  <text x="155" y="598" text-anchor="middle" fill="#92400e">bcrypt 散列</text>
-  <rect x="250" y="535" width="150" height="100" rx="6" fill="#fecaca" stroke="#dc2626" stroke-width="1.2"/>
-  <text x="325" y="558" text-anchor="middle" font-weight="bold" fill="#991b1b">Redis :6380</text>
-  <text x="325" y="578" text-anchor="middle" fill="#991b1b">限流计数</text>
-  <text x="325" y="598" text-anchor="middle" fill="#991b1b">分布式锁</text>
-  <rect x="420" y="535" width="150" height="100" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.2"/>
-  <text x="495" y="558" text-anchor="middle" font-weight="bold" fill="#166534">ClickHouse :8124</text>
-  <text x="495" y="578" text-anchor="middle" fill="#166534">指标快照 / 时序</text>
-  <text x="495" y="598" text-anchor="middle" fill="#166534">审计落库</text>
-  <rect x="590" y="535" width="150" height="100" rx="6" fill="#f3e8ff" stroke="#9333ea" stroke-width="1.2"/>
-  <text x="665" y="558" text-anchor="middle" font-weight="bold" fill="#6b21a8">Kafka :9092</text>
-  <text x="665" y="578" text-anchor="middle" fill="#6b21a8">审计事件总线</text>
-  <text x="665" y="598" text-anchor="middle" fill="#6b21a8">superops.audit</text>
-  <rect x="760" y="535" width="150" height="100" rx="6" fill="#cffafe" stroke="#0891b2" stroke-width="1.2"/>
-  <text x="835" y="558" text-anchor="middle" font-weight="bold" fill="#155e75">Consul :8500</text>
-  <text x="835" y="578" text-anchor="middle" fill="#155e75">注册发现</text>
-  <text x="835" y="598" text-anchor="middle" fill="#155e75">KV 配置</text>
-  <rect x="930" y="535" width="90" height="100" rx="6" fill="#e2e8f0" stroke="#475569" stroke-width="1.2"/>
-  <text x="975" y="558" text-anchor="middle" font-weight="bold" fill="#334155">K8s API</text>
-  <text x="975" y="578" text-anchor="middle" fill="#475569">真实集群</text>
-  <text x="975" y="598" text-anchor="middle" fill="#475569">（可选）</text>
+  <rect x="60" y="530" width="1220" height="260" rx="8" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+  <rect x="60" y="530" width="1220" height="30" rx="8" fill="#0f172a"/>
+  <rect x="60" y="545" width="1220" height="15" fill="#0f172a"/>
+  <text x="80" y="550" font-weight="bold" fill="#ffffff">数据层（虚线框 = 可选后端）</text>
+  <rect x="80" y="575" width="170" height="100" rx="6" fill="#fef3c7" stroke="#d97706" stroke-width="1.2"/>
+  <text x="165" y="598" text-anchor="middle" font-weight="bold" fill="#92400e">MySQL 8 :3307</text>
+  <text x="165" y="618" text-anchor="middle" fill="#92400e">用户 / API Key</text>
+  <text x="165" y="638" text-anchor="middle" fill="#92400e">bcrypt 散列</text>
+  <rect x="270" y="575" width="170" height="100" rx="6" fill="#fecaca" stroke="#dc2626" stroke-width="1.2"/>
+  <text x="355" y="598" text-anchor="middle" font-weight="bold" fill="#991b1b">Redis :6380</text>
+  <text x="355" y="618" text-anchor="middle" fill="#991b1b">限流计数</text>
+  <text x="355" y="638" text-anchor="middle" fill="#991b1b">分布式锁</text>
+  <rect x="460" y="575" width="170" height="100" rx="6" fill="#dcfce7" stroke="#16a34a" stroke-width="1.2"/>
+  <text x="545" y="598" text-anchor="middle" font-weight="bold" fill="#166534">ClickHouse :8124</text>
+  <text x="545" y="618" text-anchor="middle" fill="#166534">指标快照 / 时序</text>
+  <text x="545" y="638" text-anchor="middle" fill="#166534">审计落库 / 领域事件</text>
+  <rect x="650" y="575" width="170" height="100" rx="6" fill="#f3e8ff" stroke="#9333ea" stroke-width="1.2"/>
+  <text x="735" y="598" text-anchor="middle" font-weight="bold" fill="#6b21a8">Kafka :9092</text>
+  <text x="735" y="618" text-anchor="middle" fill="#6b21a8">审计事件总线</text>
+  <text x="735" y="638" text-anchor="middle" fill="#6b21a8">superops.audit</text>
+  <rect x="840" y="575" width="170" height="100" rx="6" fill="#cffafe" stroke="#0891b2" stroke-width="1.2"/>
+  <text x="925" y="598" text-anchor="middle" font-weight="bold" fill="#155e75">Consul :8500</text>
+  <text x="925" y="618" text-anchor="middle" fill="#155e75">注册发现</text>
+  <text x="925" y="638" text-anchor="middle" fill="#155e75">KV 配置</text>
+  <rect x="1030" y="575" width="110" height="100" rx="6" fill="#e2e8f0" stroke="#475569" stroke-width="1.2"/>
+  <text x="1085" y="598" text-anchor="middle" font-weight="bold" fill="#334155">K8s API</text>
+  <text x="1085" y="618" text-anchor="middle" fill="#475569">真实集群</text>
+  <text x="1085" y="638" text-anchor="middle" fill="#475569">（可选）</text>
+
+  <rect x="80" y="695" width="210" height="75" rx="6" fill="#ecfccb" stroke="#65a30d" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="185" y="718" text-anchor="middle" font-weight="bold" fill="#3f6212">Neo4j :7687</text>
+  <text x="185" y="738" text-anchor="middle" fill="#3f6212">资产拓扑（可选）</text>
+  <rect x="310" y="695" width="210" height="75" rx="6" fill="#ffedd5" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="415" y="718" text-anchor="middle" font-weight="bold" fill="#9a3412">Elasticsearch :9200</text>
+  <text x="415" y="738" text-anchor="middle" fill="#9a3412">日志检索（可选）</text>
+  <rect x="540" y="695" width="210" height="75" rx="6" fill="#e0e7ff" stroke="#4f46e5" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="645" y="718" text-anchor="middle" font-weight="bold" fill="#3730a3">etcd :2379</text>
+  <text x="645" y="738" text-anchor="middle" fill="#3730a3">注册中心（可选）</text>
+  <rect x="770" y="695" width="210" height="75" rx="6" fill="#fce7f3" stroke="#db2777" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="875" y="718" text-anchor="middle" font-weight="bold" fill="#9d174d">MinIO/S3 :9000</text>
+  <text x="875" y="738" text-anchor="middle" fill="#9d174d">备份存储（可选）</text>
+  <rect x="1000" y="695" width="210" height="75" rx="6" fill="#ecfeff" stroke="#06b6d4" stroke-width="1.2" stroke-dasharray="5 3"/>
+  <text x="1105" y="718" text-anchor="middle" font-weight="bold" fill="#0e7490">MQTT/NATS :1883</text>
+  <text x="1105" y="738" text-anchor="middle" fill="#0e7490">消息总线（可选）</text>
 
   <!-- 可观测 -->
-  <rect x="60" y="680" width="150" height="56" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
-  <text x="135" y="704" text-anchor="middle" font-weight="bold" fill="#334155">Prometheus :9095</text>
-  <text x="135" y="722" text-anchor="middle" fill="#64748b">抓取 /metrics</text>
-  <rect x="230" y="680" width="150" height="56" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
-  <text x="305" y="704" text-anchor="middle" font-weight="bold" fill="#334155">Jaeger :16686</text>
-  <text x="305" y="722" text-anchor="middle" fill="#64748b">OTLP span / 追踪</text>
-  <rect x="400" y="680" width="640" height="76" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
-  <text x="420" y="702" font-weight="bold" fill="#1e40af">可观测</text>
-  <text x="420" y="720" fill="#334155">Prometheus 抓取 gateway :8080/metrics；Jaeger 收集 gateway / k8s 的</text>
-  <text x="420" y="738" fill="#334155">OTLP span —— 数据流详见「架构总览」</text>
-  <path d="M 965 274 L 965 430 L 1070 430 L 1070 708 L 1040 708" stroke="#2563eb" stroke-width="1" stroke-dasharray="4 3" fill="none" marker-end="url(#arrow-blue)"/>
+  <rect x="60" y="795" width="150" height="56" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="135" y="819" text-anchor="middle" font-weight="bold" fill="#334155">Prometheus :9095</text>
+  <text x="135" y="837" text-anchor="middle" fill="#64748b">抓取 /metrics</text>
+  <rect x="230" y="795" width="150" height="56" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1.5"/>
+  <text x="305" y="819" text-anchor="middle" font-weight="bold" fill="#334155">Jaeger :16686</text>
+  <text x="305" y="837" text-anchor="middle" fill="#64748b">OTLP span / 追踪</text>
+  <rect x="400" y="795" width="820" height="76" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.2"/>
+  <text x="420" y="817" font-weight="bold" fill="#1e40af">可观测</text>
+  <text x="420" y="835" fill="#334155">Prometheus 抓取 gateway :8080/metrics；Jaeger 收集 gateway / k8s 的</text>
+  <text x="420" y="853" fill="#334155">OTLP span —— 数据流详见「架构总览」</text>
+  <path d="M 962 274 L 962 430 L 1255 430 L 1255 835 L 1220 835" stroke="#2563eb" stroke-width="1" stroke-dasharray="4 3" fill="none" marker-end="url(#arrow-blue)"/>
 
   <!-- 框架 -->
-  <rect x="60" y="770" width="980" height="88" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
-  <text x="80" y="792" font-weight="bold" fill="#334155">e-cat 框架组件（贯穿各层）</text>
-  <text x="80" y="814" fill="#64748b">ecat-auth · ecat-middleware · ecat-circuit-breaker · ecat-config-remote · ecat-registry-consul · ecat-mq-kafka</text>
-  <text x="80" y="832" fill="#64748b">ecat-scheduler · ecat-lock · ecat-data(-sqlx / -clickhouse / -redis)</text>
-  <text x="80" y="850" fill="#64748b">ecat-tracing-otlp · ecat-openapi · ecat-security · ecat-tls</text>
+  <rect x="60" y="885" width="1220" height="88" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="80" y="907" font-weight="bold" fill="#334155">e-cat 框架组件（贯穿各层）</text>
+  <text x="80" y="927" fill="#64748b">ecat-auth · ecat-middleware · ecat-circuit-breaker · ecat-config-remote · ecat-registry(-consul / -etcd) · ecat-mq(-kafka / -mqtt / -nats)</text>
+  <text x="80" y="945" fill="#64748b">ecat-scheduler · ecat-lock · ecat-data(-sqlx / -clickhouse / -redis / -neo4j / -elasticsearch / -opensearch / -s3)</text>
+  <text x="80" y="963" fill="#64748b">ecat-tracing-otlp · ecat-openapi · ecat-security · ecat-tls · ecat-events · ecat-graphql</text>
 </svg>

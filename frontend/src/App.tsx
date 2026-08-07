@@ -13,6 +13,7 @@ const DeploymentsPage = lazy(() => import('./pages/k8s/deployments'));
 const NodesPage = lazy(() => import('./pages/k8s/nodes'));
 const TerminalPage = lazy(() => import('./pages/k8s/terminal'));
 const AuditPage = lazy(() => import('./pages/ops/audit'));
+const EventsPage = lazy(() => import('./pages/ops/events'));
 const ApiKeysPage = lazy(() => import('./pages/ops/apikeys'));
 const UsersPage = lazy(() => import('./pages/ops/users'));
 const CmdbPage = lazy(() => import('./pages/cmdb'));
@@ -46,7 +47,8 @@ const menuData = [
   ]},
   { path: '/cmdb', name: 'CMDB 资产', icon: <DatabaseOutlined /> },
   { path: '/ops', name: '运维中心', icon: <SettingOutlined />, children: [
-    { path: '/ops/audit', name: '审计中心' }, { path: '/ops/apikeys', name: 'API Keys' },
+    { path: '/ops/audit', name: '审计中心' }, { path: '/ops/events', name: '领域事件' },
+    { path: '/ops/apikeys', name: 'API Keys' },
     { path: '/ops/users', name: '用户管理' }, { path: '/ops/scripts', name: '脚本库' },
     { path: '/ops/alerts', name: '告警中心' }, { path: '/ops/alert-rules', name: '告警规则' }, { path: '/ops/metrics', name: '指标看板' },
     { path: '/ops/logs', name: '日志检索' }, { path: '/ops/recordings', name: '录制回放' },
@@ -81,6 +83,7 @@ export default function App() {
           <Route path="/k8s/terminal" element={<TerminalPage />} />
           <Route path="/cmdb" element={<CmdbPage />} />
           <Route path="/ops/audit" element={<AuditPage />} />
+          <Route path="/ops/events" element={<EventsPage />} />
           <Route path="/ops/apikeys" element={<ApiKeysPage />} />
           <Route path="/ops/users" element={<UsersPage />} />
           <Route path="/ops/scripts" element={<ScriptsPage />} />

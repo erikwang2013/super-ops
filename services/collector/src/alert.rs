@@ -490,6 +490,20 @@ async fn inspect_work(cfg: &Config) -> anyhow::Result<()> {
     let ch = clickhouse_from(cfg)?;
     let points = health_to_points(&health.alerts, now_secs());
     ecat_data::TsdbClient::write(ch.as_ref(), &points).await?;
+    // 领域事件：告警同步广播到事件总线（gateway 端落 ClickHouse domain_event）
+    for a in &health.alerts {
+        let event = superops_protos::events::DomainEvent::new(
+            "alert",
+            &a.level,
+            &a.title,
+            &a.message,
+        )
+        .with_detail(serde_json::json!({ "node": a.node }))
+        .with_ts(now_secs());
+        if let Err(e) = crate::domain_events::publish_domain_event(cfg, &event).await {
+            tracing::warn!("alert domain event publish failed: {e}");
+        }
+    }
 
     let http = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))

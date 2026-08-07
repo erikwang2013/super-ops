@@ -14,8 +14,14 @@ ecat-data-redis = { path = "../../ecat-data-redis" }
 ecat-lock = { path = "../../ecat-lock" }
 ecat-mq = { path = "../../ecat-mq" }
 ecat-mq-kafka = { path = "../../ecat-mq-kafka" }
+ecat-mq-mqtt = { path = "../../ecat-mq-mqtt" }
+ecat-mq-nats = { path = "../../ecat-mq-nats" }
 ecat-registry = { path = "../../ecat-registry" }
 ecat-registry-consul = { path = "../../ecat-registry-consul" }
+ecat-registry-etcd = { path = "../../ecat-registry-etcd" }
+ecat-events = { path = "../../ecat-events" }
+ecat-data-elasticsearch = { path = "../../ecat-data-elasticsearch" }
+ecat-data-opensearch = { path = "../../ecat-data-opensearch" }
 ecat-scheduler = { path = "../../ecat-scheduler" }
 ecat-tracing-otlp = { path = "../../ecat-tracing-otlp" }
 tonic.workspace = true

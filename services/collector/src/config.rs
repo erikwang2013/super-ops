@@ -1,6 +1,8 @@
 use ecat_data_clickhouse::ClickhouseConfig;
 use ecat_data_redis::RedisConfig;
 use ecat_mq_kafka::KafkaConfig;
+use ecat_mq_mqtt::MqttConfig;
+use ecat_mq_nats::NatsConfig;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -245,6 +247,38 @@ impl Default for MysqlConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct EtcdConfig {
+    pub endpoints: Vec<String>,
+    #[serde(default = "default_etcd_prefix")]
+    pub prefix: String,
+}
+
+fn default_etcd_prefix() -> String {
+    "superops/services".into()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SearchConfig {
+    #[serde(default = "default_search_provider")]
+    pub provider: String, // elasticsearch | opensearch
+    pub base_url: String,
+    #[serde(default)]
+    pub username: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
+    #[serde(default = "default_search_index")]
+    pub index: String,
+}
+
+fn default_search_provider() -> String {
+    "elasticsearch".into()
+}
+
+fn default_search_index() -> String {
+    "superops-logs".into()
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub ch: ClickhouseConfig,
     pub mq: KafkaConfig,
@@ -253,6 +287,14 @@ pub struct Config {
     pub k8s: K8sConfig,
     #[serde(default)]
     pub collector: CollectorConfig,
+    #[serde(default)]
+    pub mqtt: Option<MqttConfig>,
+    #[serde(default)]
+    pub nats: Option<NatsConfig>,
+    #[serde(default)]
+    pub search: Option<SearchConfig>,
+    #[serde(default)]
+    pub etcd: Option<EtcdConfig>,
     #[serde(default)]
     pub consul: Option<ConsulConfig>,
     #[serde(default)]

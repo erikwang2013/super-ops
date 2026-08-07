@@ -1,9 +1,9 @@
 import { ProTable } from '@ant-design/pro-components';
-import { Button, Modal, Form, Input, Select, Popconfirm, Tag, message } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Button, Modal, Form, Input, Select, Popconfirm, Tag, Tabs, Empty, Space, Alert, message } from 'antd';
+import { PlusOutlined, SyncOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { cmdbApi, AssetRow, CmdbAssetInput } from '../../services/api';
+import { cmdbApi, AssetRow, CmdbAssetInput, topologyApi, TopologyData, TopoNode } from '../../services/api';
 
 const ASSET_TYPES = [
   { label: '主机', value: 'host' },
@@ -18,7 +18,83 @@ const TYPE_COLORS: Record<string, string> = {
   host: 'green', switch: 'blue', router: 'purple', app: 'orange', db: 'gold', storage: 'cyan',
 };
 
-export default function CmdbPage() {
+const NODE_FILLS: Record<string, string> = {
+  host: '#16a34a', switch: '#2563eb', router: '#9333ea', app: '#ea580c', db: '#d4a017', storage: '#0891b2',
+};
+
+const NODE_W = 140;
+const NODE_H = 52;
+
+function layout(nodes: TopoNode[], w: number, h: number) {
+  const cx = w / 2, cy = h / 2;
+  const r = Math.max(150, (nodes.length * 80) / (2 * Math.PI) + 60);
+  const pos = new Map<string, { x: number; y: number }>();
+  nodes.forEach((n, i) => {
+    const a = (2 * Math.PI * i) / Math.max(1, nodes.length) - Math.PI / 2;
+    pos.set(n.key, { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+  });
+  return pos;
+}
+
+function TopologyView() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ['cmdb-topology'],
+    queryFn: () => topologyApi.get(),
+  });
+  const sync = useMutation({
+    mutationFn: () => topologyApi.sync(),
+    onSuccess: (r) => {
+      message.success(`拓扑同步完成：${r.synced} 资产 / ${r.edges} 依赖`);
+      qc.invalidateQueries({ queryKey: ['cmdb-topology'] });
+    },
+    onError: (e: Error) => message.error(e.message),
+  });
+  if (isLoading) return <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8' }}>加载拓扑…</div>;
+  const topo: TopologyData = data || { provider: '', nodes: [], edges: [] };
+  const W = 920, H = 560;
+  const pos = layout(topo.nodes, W, H);
+  return <div style={{ paddingTop: 8 }}>
+    <Space style={{ marginBottom: 8 }}>
+      <Button icon={<SyncOutlined />} loading={sync.isPending} onClick={() => sync.mutate()}>同步拓扑</Button>
+      <span style={{ color: '#64748b' }}>图数据库后端：{topo.provider || '未配置（gateway.yaml graph 段）'}</span>
+    </Space>
+    {topo.nodes.length === 0
+      ? <Empty description="无拓扑数据，请先同步" />
+      : <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ border: '1px solid #e2e8f0', borderRadius: 8, background: '#f8fafc' }}>
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 z" fill="#94a3b8" />
+            </marker>
+          </defs>
+          {topo.edges.map((e, i) => {
+            const s = pos.get(e.src), d = pos.get(e.dst);
+            if (!s || !d) return null;
+            const x1 = s.x, y1 = s.y, x2 = d.x, y2 = d.y;
+            const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - 30;
+            return <path key={`e${i}`} d={`M${x1},${y1} Q${mx},${my} ${x2},${y2}`}
+              fill="none" stroke="#94a3b8" strokeWidth="1.5" markerEnd="url(#arrow)" />;
+          })}
+          {topo.nodes.map((n) => {
+            const p = pos.get(n.key);
+            if (!p) return null;
+            const x = p.x - NODE_W / 2, y = p.y - NODE_H / 2;
+            const fill = NODE_FILLS[n.asset_type] || '#64748b';
+            const stroke = n.status === 'active' ? '#16a34a' : '#ef4444';
+            const short = n.name.length > 12 ? `${n.name.slice(0, 11)}…` : n.name;
+            return <g key={n.key}>
+              <rect x={x} y={y} width={NODE_W} height={NODE_H} rx={10} fill="#ffffff"
+                stroke={stroke} strokeWidth={2} />
+              <rect x={x} y={y} width={6} height={NODE_H} rx={3} fill={fill} />
+              <text x={x + 16} y={y + 24} fontSize={14} fontWeight={600} fill="#0f172a">{short}</text>
+              <text x={x + 16} y={y + 42} fontSize={11} fill="#64748b">{n.asset_type} · {n.env || '—'}</text>
+            </g>;
+          })}
+        </svg>}
+  </div>;
+}
+
+function AssetsTab() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm<CmdbAssetInput>();
@@ -77,9 +153,22 @@ export default function CmdbPage() {
           <Input placeholder="可选" />
         </Form.Item>
         <Form.Item name="labels" label="Labels">
-          <Input.TextArea placeholder="JSON，可选" rows={2} />
+          <Input.TextArea placeholder="JSON，可选（depends_on: 依赖资产名列表会生成拓扑边）" rows={3} />
         </Form.Item>
       </Form>
     </Modal>
+  </>;
+}
+
+export default function CmdbPage() {
+  return <>
+    <Alert type="info" showIcon style={{ marginBottom: 12 }}
+      message={'资产 labels 中配置 depends_on（JSON 数组，如 {"depends_on":["db-m"]}）后，拓扑页可将依赖关系渲染为图'} />
+    <Tabs
+      items={[
+        { key: 'list', label: '资产列表', children: <AssetsTab /> },
+        { key: 'topology', label: '拓扑图', children: <TopologyView /> },
+      ]}
+    />
   </>;
 }

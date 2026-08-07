@@ -81,6 +81,20 @@ pub async fn drift_once(cfg: &Config) -> anyhow::Result<()> {
     let ch = clickhouse_from(cfg)?;
     TsdbClient::write(ch.as_ref(), &drift_points(&events, now_secs())).await?;
     tracing::info!(count = drifted.len(), "config drift detected");
+    // 领域事件：配置漂移同步广播到事件总线
+    for name in &drifted {
+        let event = superops_protos::events::DomainEvent::new(
+            "drift",
+            "WARN",
+            "config-drift",
+            format!("deployment {name} 未在 CMDB 登记"),
+        )
+        .with_detail(serde_json::json!({ "deployment": name }))
+        .with_ts(now_secs());
+        if let Err(e) = crate::domain_events::publish_domain_event(cfg, &event).await {
+            tracing::warn!("drift domain event publish failed: {e}");
+        }
+    }
     Ok(())
 }
 

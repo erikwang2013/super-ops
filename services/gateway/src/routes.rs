@@ -303,6 +303,67 @@ pub async fn app(
         state.clone(),
         auth_middleware,
     ));
+    // S3/MinIO 备份对象列表（storage 配置后可用）
+    let backups_objects = breaker(axum::Router::new().route(
+        "/api/backups/objects",
+        axum::routing::get(crate::backup_api::list_backup_objects_handler),
+    ))
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:cmdb", req, next)
+    }))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    // CMDB 资产拓扑：同步（写图库）、查询、原生 Cypher 探索
+    let topology = breaker(
+        axum::Router::new()
+            .route(
+                "/api/cmdb/topology",
+                axum::routing::get(crate::cmdb_topology::get_topology),
+            )
+            .route(
+                "/api/cmdb/topology/sync",
+                axum::routing::post(crate::cmdb_topology::sync_topology),
+            )
+            .route(
+                "/api/cmdb/topology/explore",
+                axum::routing::post(crate::cmdb_topology::explore_graph),
+            ),
+    )
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:cmdb", req, next)
+    }))
+    .layer(middleware::from_fn(require_tenant))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    // 领域事件流（ecat-events 总线 → ClickHouse domain_event）
+    let domain_events = breaker(axum::Router::new().route(
+        "/api/events",
+        axum::routing::get(crate::domain_events::list_domain_events),
+    ))
+    .layer(middleware::from_fn(move |req, next| {
+        require_role("ops:audit", req, next)
+    }))
+    .layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
+    // GraphQL API：ecat-graphql 解析器挂载在 /api/graphql
+    let graphql = axum::Router::new()
+        .nest(
+            "/api",
+            ecat_graphql::graphql_router(crate::graphql::build_schema(state.clone())),
+        )
+        .layer(middleware::from_fn(move |req, next| {
+            require_role("api:read", req, next)
+        }))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
     let secrets = axum::Router::new()
         .route(
             "/api/secrets",
@@ -574,6 +635,10 @@ pub async fn app(
         .merge(config_remote)
         .merge(backups_read)
         .merge(backups_write)
+        .merge(backups_objects)
+        .merge(topology)
+        .merge(domain_events)
+        .merge(graphql)
         .merge(users)
         .merge(secrets)
         .merge(recordings_read)
