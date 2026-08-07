@@ -1,8 +1,15 @@
 import { StatisticCard } from '@ant-design/pro-components';
-import { Card, Col, Row, Select } from 'antd';
-import { useState } from 'react';
+import { Button, Card, Col, Empty, Row, Segmented, Select, Space, message } from 'antd';
+import { DownloadOutlined } from '@ant-design/icons';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import * as echarts from 'echarts/core';
+import { BarChart, LineChart } from 'echarts/charts';
+import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
 import { api } from '../../services/api';
+
+echarts.use([BarChart, LineChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer]);
 
 interface MetricPreset { label: string; measurement: string; series: string; field: string; }
 // 指标选择器：与后端实际写入的 measurement/field 对齐（collector ch.rs/housekeeping.rs）
@@ -15,63 +22,106 @@ const PRESETS: MetricPreset[] = [
   { label: 'Pod 重启次数', measurement: 'resource_snapshot', series: 'pod', field: 'restarts' },
 ];
 
-interface MetricRow { series: string; value: number; ts: number; }
+const WINDOWS = [
+  { label: '1h', secs: 3600, bucket: 5 },
+  { label: '6h', secs: 21600, bucket: 15 },
+  { label: '24h', secs: 86400, bucket: 60 },
+  { label: '7d', secs: 604800, bucket: 360 },
+] as const;
 
-function TrendChart({ rows }: { rows: MetricRow[] }) {
-  const W = 640, H = 200, PAD = 40;
-  if (rows.length === 0) {
-    return <div style={{ padding: 48, textAlign: 'center', color: '#999' }}>暂无数据</div>;
-  }
-  const vals = rows.map((r) => Number(r.value) || 0);
-  const max = Math.max(...vals, 1);
-  const min = Math.min(...vals, 0);
-  const span = max - min || 1;
-  const n = rows.length;
-  const x = (i: number) => (n === 1 ? W / 2 : PAD + (i * (W - 2 * PAD)) / (n - 1));
-  const y = (v: number) => H - PAD - ((v - min) / span) * (H - 2 * PAD);
-  return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
-      <line x1={PAD} y1={y(0)} x2={W - PAD} y2={y(0)} stroke="#e8e8e8" strokeDasharray="4 4" />
-      <polyline points={rows.map((r, i) => `${x(i)},${y(Number(r.value) || 0)}`).join(' ')}
-        fill="none" stroke="#1677ff" strokeWidth="2" />
-      {rows.map((r, i) => (
-        <g key={r.series}>
-          <circle cx={x(i)} cy={y(Number(r.value) || 0)} r="3.5" fill="#1677ff" />
-          <text x={x(i)} y={y(Number(r.value) || 0) - 8} textAnchor="middle" fontSize="11">{Number(r.value) || 0}</text>
-          <text x={x(i)} y={H - 10} textAnchor="middle" fontSize="11" fill="#999">{r.series}</text>
-        </g>
-      ))}
-    </svg>
-  );
-}
+interface MetricRow { bucket: string; series: string; value: number; }
 
 export default function MetricsPage() {
   const [idx, setIdx] = useState(0);
+  const [win, setWin] = useState(0);
+  const [kind, setKind] = useState<'line' | 'bar'>('line');
   const preset = PRESETS[idx];
+  const w = WINDOWS[win];
   const { data, isLoading } = useQuery({
-    queryKey: ['metrics', preset],
+    queryKey: ['metrics-trend', preset, w],
     queryFn: () => api.get<MetricRow[]>(
-      `/v1/metrics/query?measurement=${preset.measurement}&series=${preset.series}&field=${preset.field}&window_secs=3600`),
+      `/metrics/trend?measurement=${preset.measurement}&series=${preset.series}&field=${preset.field}&window_secs=${w.secs}&bucket_minutes=${w.bucket}`),
   });
   const rows = data || [];
-  const latest = Math.round(rows.reduce((s, r) => s + (Number(r.value) || 0), 0) * 100) / 100;
-  // 行序不保证按时间排列，取最新时间戳展示
-  const at = rows.length ? new Date(Math.max(...rows.map((r) => r.ts)) * 1000).toLocaleString() : '-';
+
+  const chartRef = useRef<HTMLDivElement | null>(null);
+  const chart = useRef<ReturnType<typeof echarts.init> | null>(null);
+  const hasRows = rows.length > 0;
+
+  useEffect(() => {
+    if (!chartRef.current || !hasRows) return;
+    chart.current = echarts.init(chartRef.current);
+    const onResize = () => chart.current?.resize();
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      chart.current?.dispose();
+      chart.current = null;
+    };
+  }, [hasRows]);
+
+  useEffect(() => {
+    if (!chart.current) return;
+    const buckets = Array.from(new Set(rows.map((r) => r.bucket))).sort();
+    const names = Array.from(new Set(rows.map((r) => r.series))).sort();
+    const series = names.map((s) => ({
+      name: s,
+      type: kind,
+      smooth: kind === 'line',
+      data: buckets.map((b) => rows.find((r) => r.series === s && r.bucket === b)?.value ?? null),
+    }));
+    chart.current.setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { type: 'scroll', top: 0 },
+      grid: { left: 48, right: 24, top: 32, bottom: 48 },
+      xAxis: { type: 'category', data: buckets, axisLabel: { rotate: buckets.length > 12 ? 30 : 0 } },
+      yAxis: { type: 'value' },
+      series,
+    }, true);
+  }, [rows, kind]);
+
+  const exportCsv = () => {
+    if (!rows.length) { message.warning('无数据可导出'); return; }
+    const header = 'bucket,series,value\n';
+    const body = rows.map((r) => `${r.bucket},${r.series},${r.value}`).join('\n');
+    const blob = new Blob(['﻿' + header + body], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `metrics-${preset.field}-${w.secs}s.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    message.success('CSV 已导出');
+  };
+
+  const latestBySeries = new Map<string, number>();
+  for (const r of rows) latestBySeries.set(r.series, r.value); // 行按 bucket 升序，后者即各序列最新值
+  const latest = Math.round(Array.from(latestBySeries.values()).reduce((s, v) => s + v, 0) * 100) / 100;
+
   return (
     <div>
       <Card title="指标看板">
-        <Select value={idx} style={{ width: 220 }} onChange={setIdx}
-          options={PRESETS.map((p, i) => ({ value: i, label: p.label }))} />
+        <Space wrap>
+          <Select value={idx} style={{ width: 220 }} onChange={setIdx}
+            options={PRESETS.map((p, i) => ({ value: i, label: p.label }))} />
+          <Segmented value={win} onChange={(v) => setWin(v as number)}
+            options={WINDOWS.map((x, i) => ({ label: x.label, value: i }))} />
+          <Segmented value={kind} onChange={(v) => setKind(v as 'line' | 'bar')}
+            options={[{ label: '折线', value: 'line' }, { label: '柱状', value: 'bar' }]} />
+          <Button icon={<DownloadOutlined />} onClick={exportCsv}>导出 CSV</Button>
+        </Space>
       </Card>
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col span={8}>
-          <StatisticCard statistic={{ title: '最近值', value: latest, description: `${preset.field} · 近 1h` }} />
+          <StatisticCard statistic={{ title: '最近值（Σ各序列）', value: latest, description: `${preset.field} · ${w.label}` }} />
         </Col>
-        <Col span={8}><StatisticCard statistic={{ title: 'Series 数', value: rows.length, description: at }} /></Col>
-        <Col span={8}><StatisticCard statistic={{ title: '窗口', value: '1h', description: 'window_secs=3600' }} /></Col>
+        <Col span={8}><StatisticCard statistic={{ title: 'Series 数', value: latestBySeries.size }} /></Col>
+        <Col span={8}><StatisticCard statistic={{ title: '窗口', value: w.label, description: `${w.bucket}min 桶` }} /></Col>
       </Row>
-      <Card title={`趋势 · ${preset.label}`} loading={isLoading} style={{ marginTop: 16 }}>
-        <TrendChart rows={rows} />
+      <Card title={`趋势 · ${preset.label}（按 ${preset.series} 分组）`} loading={isLoading} style={{ marginTop: 16 }}>
+        {hasRows
+          ? <div ref={chartRef} style={{ width: '100%', height: 360 }} />
+          : <Empty description="暂无数据（需 collector 运行并写入 ClickHouse）" style={{ padding: 48 }} />}
       </Card>
     </div>
   );

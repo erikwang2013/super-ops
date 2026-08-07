@@ -41,8 +41,8 @@ pub fn k8s_read_routes() -> axum::Router<crate::AppState> {
         )
         .route("/api/k8s/aggregate", axum::routing::get(aggregate_clusters))
         .route(
-            "/api/v1/metrics/query",
-            axum::routing::get(crate::metrics_api::metrics_query),
+            "/api/metrics/trend",
+            axum::routing::get(crate::metrics_api::metrics_trend),
         )
 }
 
