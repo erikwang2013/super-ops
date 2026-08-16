@@ -66,9 +66,12 @@ impl TransportServer for HttpServer {
         let shutdown_signal = async move {
             let _ = rx.changed().await;
         };
-        axum::serve(listener, router)
-            .with_graceful_shutdown(shutdown_signal)
-            .await?;
+        axum::serve(
+            listener,
+            router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .with_graceful_shutdown(shutdown_signal)
+        .await?;
         Ok(())
     }
 

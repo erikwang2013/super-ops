@@ -9,7 +9,6 @@ description = "SuperOps K8s Service - multi-cluster management"
 superops-protos = { path = "../../superops-protos" }
 ecat = { path = "../../ecat" }
 ecat-transport-grpc = { path = "../../ecat-transport-grpc" }
-ecat-data-sqlx = { path = "../../ecat-data-sqlx" }
 ecat-registry = { path = "../../ecat-registry" }
 ecat-registry-consul = { path = "../../ecat-registry-consul" }
 ecat-tracing-otlp = { path = "../../ecat-tracing-otlp" }

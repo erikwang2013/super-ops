@@ -25,10 +25,21 @@ async fn main() -> anyhow::Result<()> {
         None => None,
     };
     let manager = ClusterManager::new();
+    let auth_token = config.auth.token.clone();
+    let service = K8sServiceImpl { manager };
 
-    let grpc = GrpcServer::new(format!("0.0.0.0:{}", config.server.grpc_port)).routes(
-        tonic::service::Routes::new(K8sServiceServer::new(K8sServiceImpl { manager })),
-    );
+    // P0 安全基线：配置 auth.token 时启用 Bearer 鉴权（无凭据调用被拒），未配置时 WARN 保持兼容
+    let routes = if auth_token.is_empty() {
+        tracing::warn!("k8s gRPC auth disabled: no auth.token configured (insecure)");
+        tonic::service::Routes::new(K8sServiceServer::new(service))
+    } else {
+        let bearer = format!("Bearer {auth_token}");
+        tonic::service::Routes::new(K8sServiceServer::with_interceptor(
+            service,
+            auth_interceptor(bearer),
+        ))
+    };
+    let grpc = GrpcServer::new(format!("0.0.0.0:{}", config.server.grpc_port)).routes(routes);
 
     let reg_holder = Arc::new(Mutex::new(None::<Registration>));
     let reg_start = Arc::clone(&reg_holder);
@@ -58,4 +69,57 @@ async fn main() -> anyhow::Result<()> {
     app.run().await.map_err(|e| anyhow::anyhow!("{e}"))?;
 
     Ok(())
+}
+
+/// Bearer 令牌校验：metadata `authorization` 恰等于 `expected`（如 "Bearer <token>"）。
+fn bearer_authorized(metadata: &tonic::metadata::MetadataMap, expected: &str) -> bool {
+    metadata
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .map(|a| a == expected)
+        .unwrap_or(false)
+}
+
+/// 构造 Bearer 校验拦截器（result_large_err：tonic::Status 为 API 要求，无法缩小）。
+/// 闭包仅捕获 String，自动实现 Clone，满足 tonic Routes 的服务 Clone 约束。
+#[allow(clippy::result_large_err)]
+fn auth_interceptor(
+    bearer: String,
+) -> impl Clone + Fn(tonic::Request<()>) -> Result<tonic::Request<()>, tonic::Status> {
+    move |req: tonic::Request<()>| {
+        if bearer_authorized(req.metadata(), &bearer) {
+            Ok(req)
+        } else {
+            Err(tonic::Status::unauthenticated(
+                "missing or invalid bearer token",
+            ))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bearer_authorized;
+    use tonic::metadata::MetadataMap;
+
+    #[test]
+    fn auth_rejects_missing_token() {
+        assert!(!bearer_authorized(&MetadataMap::new(), "Bearer secret"));
+    }
+
+    #[test]
+    fn auth_accepts_matching_bearer() {
+        let mut m = MetadataMap::new();
+        m.insert("authorization", "Bearer secret".parse().unwrap());
+        assert!(bearer_authorized(&m, "Bearer secret"));
+    }
+
+    #[test]
+    fn auth_rejects_wrong_or_malformed_token() {
+        let mut m = MetadataMap::new();
+        m.insert("authorization", "Bearer other".parse().unwrap());
+        assert!(!bearer_authorized(&m, "Bearer secret"));
+        m.insert("authorization", "secret".parse().unwrap());
+        assert!(!bearer_authorized(&m, "Bearer secret"));
+    }
 }

@@ -89,12 +89,13 @@ pub async fn login(
             state.auth.config.refresh_token_ttl,
         )
         .map_err(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "failed to issue token"))?;
-    publish_audit(
+    crate::audit::publish(
         &state,
         "login_success",
         &user.username,
-        "login ok",
         &client_ip(&headers),
+        "login ok",
+        &serde_json::json!({}),
     )
     .await;
     Ok(Json(TokenResponse {
@@ -124,12 +125,13 @@ pub async fn register(
         .await
     {
         Ok(user) => {
-            publish_audit(
+            crate::audit::publish(
                 &state,
                 "register_success",
                 &user.username,
-                "new user registered",
                 &client_ip(&headers),
+                "new user registered",
+                &serde_json::json!({}),
             )
             .await;
             let ttl = state.auth.config.access_token_ttl;
@@ -159,30 +161,6 @@ fn client_ip(headers: &HeaderMap) -> String {
         .filter(|s| !s.is_empty())
         .unwrap_or("unknown")
         .to_string()
-}
-
-fn now_secs() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
-
-async fn publish_audit(state: &AppState, event_type: &str, username: &str, detail: &str, ip: &str) {
-    if let Some(mq) = &state.mq {
-        let payload = serde_json::to_vec(&serde_json::json!({
-            "ts": now_secs(),
-            "event_type": event_type,
-            "level": "INFO",
-            "username": username,
-            "ip": ip,
-            "detail": detail,
-        }))
-        .unwrap_or_default();
-        if let Err(e) = mq.publish("superops.audit", &payload).await {
-            tracing::warn!("audit publish failed: {e}");
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -224,9 +202,133 @@ pub async fn set_user_status(
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RefreshRequest {
+    pub refresh_token: String,
+}
+
+/// 从 claims 取 `jti`（黑名单吊销用）。
+pub fn claims_jti(claims: &ecat_auth::AuthClaims) -> Option<String> {
+    claims
+        .extra
+        .get("jti")
+        .and_then(|v| v.as_str())
+        .map(String::from)
+}
+
+/// POST /api/auth/refresh：校验 refresh token → 黑名单检查 → 轮换（旧 jti 作废）→ 签发新 token 对。
+pub async fn refresh(
+    State(state): State<AppState>,
+    Json(req): Json<RefreshRequest>,
+) -> Result<Json<TokenResponse>, ApiError> {
+    if req.refresh_token.is_empty() {
+        return Err(err(StatusCode::BAD_REQUEST, "refresh_token is required"));
+    }
+    let claims = state
+        .auth
+        .verify_token(&req.refresh_token)
+        .map_err(|_| err(StatusCode::UNAUTHORIZED, "invalid or expired refresh token"))?;
+    let Some(jti) = claims_jti(&claims) else {
+        return Err(err(StatusCode::UNAUTHORIZED, "invalid refresh token"));
+    };
+    if state.blacklist.is_revoked(&jti).await {
+        return Err(err(StatusCode::UNAUTHORIZED, "refresh token revoked"));
+    }
+    let sub = claims.sub.clone();
+    let username = claims
+        .extra
+        .get("username")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let role = claims.role.clone();
+
+    // 轮换：旧 refresh 立即作废（jti 入黑名单），防止重放
+    state
+        .blacklist
+        .revoke(&jti, state.auth.config.refresh_token_ttl)
+        .await;
+
+    let ttl = state.auth.config.access_token_ttl;
+    let access = state
+        .auth
+        .create_token(&sub, &username, role.as_deref(), ttl)
+        .map_err(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "failed to issue token"))?;
+    let refresh = state
+        .auth
+        .create_token(
+            &sub,
+            &username,
+            role.as_deref(),
+            state.auth.config.refresh_token_ttl,
+        )
+        .map_err(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "failed to issue token"))?;
+    Ok(Json(TokenResponse {
+        access_token: access,
+        refresh_token: refresh,
+        expires_in: ttl,
+    }))
+}
+
+/// POST /api/auth/logout：吊销 refresh token（jti 入黑名单）。
+pub async fn logout(
+    State(state): State<AppState>,
+    Json(req): Json<RefreshRequest>,
+) -> Result<StatusCode, ApiError> {
+    if req.refresh_token.is_empty() {
+        return Err(err(StatusCode::BAD_REQUEST, "refresh_token is required"));
+    }
+    let claims = state
+        .auth
+        .verify_token(&req.refresh_token)
+        .map_err(|_| err(StatusCode::UNAUTHORIZED, "invalid refresh token"))?;
+    if let Some(jti) = claims_jti(&claims) {
+        state
+            .blacklist
+            .revoke(&jti, state.auth.config.refresh_token_ttl)
+            .await;
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
+
+    fn mk_claims(jti: &str) -> ecat_auth::AuthClaims {
+        let mut extra = HashMap::new();
+        extra.insert(
+            "username".to_string(),
+            serde_json::Value::String("erik".into()),
+        );
+        extra.insert("jti".to_string(), serde_json::Value::String(jti.into()));
+        ecat_auth::AuthClaims {
+            sub: "u1".into(),
+            exp: None,
+            iat: None,
+            role: Some("admin".into()),
+            extra,
+        }
+    }
+
+    #[test]
+    fn claims_jti_extracts_jti() {
+        let c = mk_claims("jt-123");
+        assert_eq!(claims_jti(&c).as_deref(), Some("jt-123"));
+    }
+
+    #[test]
+    fn claims_jti_missing_returns_none() {
+        let c = ecat_auth::AuthClaims {
+            sub: "u1".into(),
+            exp: None,
+            iat: None,
+            role: None,
+            extra: Default::default(),
+        };
+        assert_eq!(claims_jti(&c), None);
+    }
 
     #[test]
     fn validate_user_status_accepts_enabled_and_disabled() {

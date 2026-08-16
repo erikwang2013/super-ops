@@ -1,5 +1,5 @@
 use crate::AppState;
-use crate::auth::handler::{login, register};
+use crate::auth::handler::{login, logout, refresh, register};
 use crate::auth::middleware::{auth_middleware, require_role};
 use crate::config::Config;
 use crate::model::tenant::require_tenant;
@@ -21,6 +21,28 @@ use tower_http::trace::TraceLayer;
 // tower 0.5 ServiceBuilder 先加的层在最外层，故 ErrorToResponse 先加）：
 // 请求先经 ErrorToResponse → CircuitBreaker 观测错误熔断 → FiveXxToError 把
 // handler 5xx 转为错误；断路器打开时 ErrorToResponse 将其转为 503 响应。
+/// 登录限流键：默认取真实对端 IP（axum ConnectInfo，HttpServer 已注入）；
+/// `trust_proxy` 开启时信任反向代理头（X-Forwarded-For 首 IP / X-Real-IP），防 XFF 伪造绕过。
+fn login_rate_key(trust_proxy: bool) -> impl Fn(&axum::http::Request<axum::body::Body>) -> String {
+    move |req: &axum::http::Request<axum::body::Body>| {
+        if trust_proxy {
+            req.headers()
+                .get("x-forwarded-for")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.split(',').next().map(str::trim))
+                .filter(|s| !s.is_empty())
+                .or_else(|| req.headers().get("x-real-ip").and_then(|v| v.to_str().ok()))
+                .unwrap_or("global")
+                .to_string()
+        } else {
+            req.extensions()
+                .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+                .map(|ci| ci.0.ip().to_string())
+                .unwrap_or_else(|| "global".to_string())
+        }
+    }
+}
+
 fn breaker(router: axum::Router<crate::AppState>) -> axum::Router<crate::AppState> {
     router.layer(
         tower::ServiceBuilder::new()
@@ -595,18 +617,7 @@ pub async fn app(
                 .layer(
                     RateLimitLayer::new(10, std::time::Duration::from_secs(60))
                         .with_store(rate_store)
-                        .with_key_fn(|req: &axum::http::Request<axum::body::Body>| {
-                            req.headers()
-                                .get("x-forwarded-for")
-                                .and_then(|v| v.to_str().ok())
-                                .and_then(|v| v.split(',').next().map(str::trim))
-                                .filter(|s| !s.is_empty())
-                                .or_else(|| {
-                                    req.headers().get("x-real-ip").and_then(|v| v.to_str().ok())
-                                })
-                                .unwrap_or("global")
-                                .to_string()
-                        }),
+                        .with_key_fn(login_rate_key(config.rate_limit.trust_proxy)),
                 ),
         );
 
@@ -614,6 +625,8 @@ pub async fn app(
         .route("/api/health", get(health))
         .route("/api/docs", get(docs))
         .route("/api/auth/register", post(register))
+        .route("/api/auth/refresh", post(refresh))
+        .route("/api/auth/logout", post(logout))
         .merge(login_limited)
         .merge(k8s)
         .merge(keys)

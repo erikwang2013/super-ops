@@ -2,7 +2,6 @@ use crate::ch::{clickhouse_from, now_secs};
 use crate::config::{Config, MysqlConfig};
 use ecat_data::{DataPoint, FieldValue};
 use superops_protos::k8s::v1::ListNodesRequest;
-use superops_protos::k8s::v1::k8s_service_client::K8sServiceClient;
 
 pub const DEFAULT_CPU_PRICE: f64 = 0.5;
 pub const DEFAULT_MEM_PRICE: f64 = 0.25;
@@ -177,9 +176,16 @@ fn prune_backups(dir: &str, keep: usize) {
 
 /// 汇总全部 Node allocatable 容量并写入 capacity_snapshot
 pub async fn collect_capacity(cfg: &Config) -> anyhow::Result<()> {
-    let mut client = K8sServiceClient::connect(cfg.k8s.endpoint.clone()).await?;
+    let Some(cfg) = crate::cluster::resolve_and_attach(cfg).await? else {
+        tracing::warn!("no registered cluster; skipping capacity round");
+        return Ok(());
+    };
+    let cluster_id = cfg.k8s.cluster_id.clone().unwrap_or_default();
+    let mut client = crate::cluster::k8s_client(&cfg).await?;
     let nodes = client
-        .list_nodes(ListNodesRequest::default())
+        .list_nodes(ListNodesRequest {
+            cluster_id: cluster_id.clone(),
+        })
         .await?
         .into_inner()
         .nodes;
@@ -189,9 +195,9 @@ pub async fn collect_capacity(cfg: &Config) -> anyhow::Result<()> {
         cores += parse_cpu_cores(&n.cpu);
         gib += parse_mem_gib(&n.memory);
     }
-    let ch = clickhouse_from(cfg)?;
+    let ch = clickhouse_from(&cfg)?;
     let point = DataPoint::new("capacity_snapshot")
-        .with_tag("cluster", "default")
+        .with_tag("cluster", cluster_id)
         .with_field("cpu_cores", FieldValue::Float(cores))
         .with_field("mem_gib", FieldValue::Float(gib))
         .with_field("node_count", FieldValue::Int(nodes.len() as i64))

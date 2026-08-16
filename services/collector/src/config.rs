@@ -8,12 +8,22 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Deserialize)]
 pub struct K8sConfig {
     pub endpoint: String,
+    /// 目标集群 id；未配置时启动期经 k8s-service ListClusters 自动解析（取首个注册集群）。
+    /// 多集群巡检场景可显式配置，其余周期任务统一携带该 id。
+    #[serde(default)]
+    pub cluster_id: Option<String>,
+    /// 服务间访问 k8s-service 的 Bearer 令牌（与 k8s-service.yaml `auth.token` 一致）。
+    /// 空 = 明文连接（本地开发），非空 = 每次 gRPC 请求注入 `authorization: Bearer <token>`。
+    #[serde(default)]
+    pub token: Option<String>,
 }
 
 impl Default for K8sConfig {
     fn default() -> Self {
         Self {
             endpoint: "http://localhost:9091".into(),
+            cluster_id: None,
+            token: None,
         }
     }
 }

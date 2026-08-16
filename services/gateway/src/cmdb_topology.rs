@@ -99,7 +99,10 @@ fn build_topology(result: &serde_json::Value) -> Topology {
     let mut edges = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for row in parse_neo4j_rows(result) {
-        let src = row.first().and_then(serde_json::Value::as_str).unwrap_or("");
+        let src = row
+            .first()
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("");
         if let Some(dst) = row.get(1).and_then(serde_json::Value::as_str) {
             edges.push(TopoEdge {
                 src: src.to_string(),
@@ -122,7 +125,10 @@ fn build_topology(result: &serde_json::Value) -> Topology {
             if let Some(n) = row.get(3).and_then(serde_json::Value::as_str) {
                 node.name = n.to_string();
             }
-            node.ip = row.get(4).and_then(serde_json::Value::as_str).map(|s| s.to_string());
+            node.ip = row
+                .get(4)
+                .and_then(serde_json::Value::as_str)
+                .map(|s| s.to_string());
             if let Some(e) = row.get(5).and_then(serde_json::Value::as_str) {
                 node.env = e.to_string();
             }
@@ -138,11 +144,7 @@ fn build_topology(result: &serde_json::Value) -> Topology {
     Topology { nodes, edges }
 }
 
-async fn upsert_node(
-    graph: &dyn GraphClient,
-    tenant: &str,
-    a: &AssetRow,
-) -> Result<(), String> {
+async fn upsert_node(graph: &dyn GraphClient, tenant: &str, a: &AssetRow) -> Result<(), String> {
     let params = serde_json::json!({
         "key": asset_key(tenant, &a.name),
         "tenant": tenant,
@@ -341,6 +343,8 @@ pub async fn explore_graph(
 mod tests {
     use super::*;
 
+    // 8 个参数即 8 个 JSON 字段，打包成 struct 反而降低可读性
+    #[allow(clippy::too_many_arguments)]
     fn row(
         src: &str,
         dst: Option<&str>,

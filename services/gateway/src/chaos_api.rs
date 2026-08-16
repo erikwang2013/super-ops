@@ -130,30 +130,50 @@ pub async fn run_chaos_handler(
             .into_response();
     }
     let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
-    let mut client =
-        match superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
-            .await
-        {
-            Ok(c) => c,
-            Err(e) => {
-                let msg = format!("k8s backend unreachable: {e}");
-                let _ = set_chaos_status(&state.pool, id, "failed", false, true, Some(&msg)).await;
-                return (
-                    StatusCode::BAD_GATEWAY,
-                    Json(serde_json::json!({ "error": msg })),
-                )
-                    .into_response();
-            }
-        };
+    let mut client = match crate::k8s_client::connect(&endpoint, &state.k8s_token).await {
+        Ok(c) => c,
+        Err(e) => {
+            let msg = format!("k8s backend unreachable: {e}");
+            let _ = set_chaos_status(&state.pool, id, "failed", false, true, Some(&msg)).await;
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": msg })),
+            )
+                .into_response();
+        }
+    };
     let result = match row.action.as_str() {
-        "delete" => client
-            .delete_deployment(superops_protos::k8s::v1::DeleteDeploymentRequest {
-                cluster_id: row.cluster_id.clone(),
-                namespace: "default".into(),
-                name: row.target_name.clone(),
-            })
+        "delete" => {
+            // P0 修复：delete 动作与 k8s 删除路由同走审批门禁（此前直接调 delete_deployment 绕过）
+            match crate::model::approval::check_delete_approval(
+                Some(&state.pool),
+                state.approval_enabled,
+                &row.cluster_id,
+                "default",
+                &row.target_name,
+            )
             .await
-            .map(|_| ()),
+            {
+                Ok(()) => {}
+                Err((code, msg)) => {
+                    let _ =
+                        set_chaos_status(&state.pool, id, "failed", false, true, Some(&msg)).await;
+                    return (
+                        StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+                        Json(serde_json::json!({ "error": msg })),
+                    )
+                        .into_response();
+                }
+            }
+            client
+                .delete_deployment(superops_protos::k8s::v1::DeleteDeploymentRequest {
+                    cluster_id: row.cluster_id.clone(),
+                    namespace: "default".into(),
+                    name: row.target_name.clone(),
+                })
+                .await
+                .map(|_| ())
+        }
         _ => client
             .restart_deployment(superops_protos::k8s::v1::RestartDeploymentRequest {
                 cluster_id: row.cluster_id.clone(),

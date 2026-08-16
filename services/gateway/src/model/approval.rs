@@ -112,3 +112,33 @@ pub async fn is_delete_approved(pool: &MySqlPool, target: &str) -> sqlx::Result<
     .await?;
     Ok(n > 0)
 }
+
+/// 删除门禁 target 约定 `{cluster_id}/{ns}/{name}`，避免跨集群同名 deployment 绕过。
+pub fn delete_target(cluster_id: &str, ns: &str, name: &str) -> String {
+    format!("{cluster_id}/{ns}/{name}")
+}
+
+/// 删除类操作审批门禁（统一入口）：`approval_enabled` 时检查 `{cluster_id}/{ns}/{name}`
+/// 的 delete 审批单是否已批准。k8s 删除路由与混沌 delete 动作共用，防单点绕过。
+/// `pool` 为 None 时视为门禁关闭（enabled=false 场景不触碰数据库）。
+/// 返回 `Err((http_status, message))` 表示被拦截。
+pub async fn check_delete_approval(
+    pool: Option<&MySqlPool>,
+    enabled: bool,
+    cluster_id: &str,
+    ns: &str,
+    name: &str,
+) -> Result<(), (u16, String)> {
+    if !enabled {
+        return Ok(());
+    }
+    let pool = pool.ok_or((500, "approval gate requires database".to_string()))?;
+    let target = delete_target(cluster_id, ns, name);
+    let approved = is_delete_approved(pool, &target)
+        .await
+        .map_err(|e| (502, format!("approval check failed: {e}")))?;
+    if !approved {
+        return Err((412, "删除需先通过审批 (POST /api/approvals)".to_string()));
+    }
+    Ok(())
+}

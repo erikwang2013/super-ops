@@ -2,7 +2,6 @@ use crate::ch::{clickhouse_from, now_secs};
 use crate::config::Config;
 use ecat_data::{DataPoint, FieldValue, TsdbClient};
 use std::sync::Arc;
-use superops_protos::k8s::v1::k8s_service_client::K8sServiceClient;
 use superops_protos::k8s::v1::{GetPodLogsRequest, ListPodsRequest};
 
 pub fn truncate_line(line: &str, max_bytes: usize) -> String {
@@ -34,43 +33,47 @@ pub async fn collect_once(cfg: &Config) -> anyhow::Result<()> {
     if cfg.logtail.namespaces.is_empty() {
         return Ok(());
     }
-    let mut client = K8sServiceClient::connect(cfg.k8s.endpoint.clone()).await?;
+    let Some(cluster_id) = crate::cluster::resolve_cluster_id(cfg).await? else {
+        tracing::warn!("no registered cluster; skipping logtail round");
+        return Ok(());
+    };
+    let mut client = crate::cluster::k8s_client(cfg).await?;
     let ch = clickhouse_from(cfg)?;
     // 日志检索后端：search 段配置时，同一批日志同时索引到 ES/OpenSearch
-    let search_client: Option<(Arc<dyn ecat_data::SearchClient>, String)> =
-        match &cfg.search {
-            Some(s) => {
-                let client: Arc<dyn ecat_data::SearchClient> = match s.provider.as_str() {
-                    "opensearch" => Arc::new(
-                        ecat_data_opensearch::OpenSearchClient::from_config(
-                            ecat_data_opensearch::OpenSearchConfig {
-                                base_url: s.base_url.clone(),
-                                username: s.username.clone(),
-                                password: s.password.clone(),
-                                tls: None,
-                            },
-                        )
-                        .map_err(|e| anyhow::anyhow!("opensearch config: {e}"))?,
-                    ),
-                    _ => Arc::new(
-                        ecat_data_elasticsearch::ElasticsearchClient::from_config(
-                            ecat_data_elasticsearch::ElasticsearchConfig {
-                                base_url: s.base_url.clone(),
-                                username: s.username.clone(),
-                                password: s.password.clone(),
-                                tls: None,
-                            },
-                        )
-                        .map_err(|e| anyhow::anyhow!("elasticsearch config: {e}"))?,
-                    ),
-                };
-                Some((client, s.index.clone()))
-            }
-            None => None,
-        };
+    let search_client: Option<(Arc<dyn ecat_data::SearchClient>, String)> = match &cfg.search {
+        Some(s) => {
+            let client: Arc<dyn ecat_data::SearchClient> = match s.provider.as_str() {
+                "opensearch" => Arc::new(
+                    ecat_data_opensearch::OpenSearchClient::from_config(
+                        ecat_data_opensearch::OpenSearchConfig {
+                            base_url: s.base_url.clone(),
+                            username: s.username.clone(),
+                            password: s.password.clone(),
+                            tls: None,
+                        },
+                    )
+                    .map_err(|e| anyhow::anyhow!("opensearch config: {e}"))?,
+                ),
+                _ => Arc::new(
+                    ecat_data_elasticsearch::ElasticsearchClient::from_config(
+                        ecat_data_elasticsearch::ElasticsearchConfig {
+                            base_url: s.base_url.clone(),
+                            username: s.username.clone(),
+                            password: s.password.clone(),
+                            tls: None,
+                        },
+                    )
+                    .map_err(|e| anyhow::anyhow!("elasticsearch config: {e}"))?,
+                ),
+            };
+            Some((client, s.index.clone()))
+        }
+        None => None,
+    };
     for ns in &cfg.logtail.namespaces {
         let pods = client
             .list_pods(ListPodsRequest {
+                cluster_id: cluster_id.clone(),
                 namespace: ns.clone(),
                 ..Default::default()
             })
@@ -80,7 +83,7 @@ pub async fn collect_once(cfg: &Config) -> anyhow::Result<()> {
         for pod in pods {
             let stream = match client
                 .get_pod_logs(GetPodLogsRequest {
-                    cluster_id: String::new(),
+                    cluster_id: cluster_id.clone(),
                     namespace: ns.clone(),
                     pod_name: pod.name.clone(),
                     container: String::new(),

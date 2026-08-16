@@ -1,6 +1,7 @@
 mod alert_rules_api;
 mod alerts_api;
 mod approval_api;
+mod audit;
 mod audit_api;
 mod auth;
 mod backup_api;
@@ -15,11 +16,12 @@ mod domain_events;
 mod files_api;
 mod graphql;
 mod health;
+mod k8s_client;
 mod logs_api;
 mod metrics;
 mod metrics_api;
-mod mq;
 mod model;
+mod mq;
 mod oncall_api;
 mod openapi;
 mod proxy;
@@ -70,6 +72,9 @@ pub struct AppState {
     pub search_index: String,
     pub storage: Option<Arc<dyn StorageClient>>,
     pub k8s_endpoint: Arc<RwLock<String>>,
+    pub k8s_token: String,
+    pub audit_fallback_dir: String,
+    pub blacklist: Arc<crate::auth::blacklist::BlacklistStore>,
     pub api_keys: Arc<crate::model::api_key::ApiKeyStore>,
     pub pool: MySqlPool,
     pub approval_enabled: bool,
@@ -163,13 +168,15 @@ async fn main() -> anyhow::Result<()> {
                     .map_err(|e| anyhow::anyhow!("nebulagraph config: {e}"))?,
                 ),
                 "arangodb" => Arc::new(
-                    ecat_data_arangodb::ArangoClient::from_config(ecat_data_arangodb::ArangoConfig {
-                        base_url: g.base_url.clone(),
-                        db: g.space.clone(),
-                        username: g.username.clone(),
-                        password: g.password.clone(),
-                        tls: None,
-                    })
+                    ecat_data_arangodb::ArangoClient::from_config(
+                        ecat_data_arangodb::ArangoConfig {
+                            base_url: g.base_url.clone(),
+                            db: g.space.clone(),
+                            username: g.username.clone(),
+                            password: g.password.clone(),
+                            tls: None,
+                        },
+                    )
                     .map_err(|e| anyhow::anyhow!("arangodb config: {e}"))?,
                 ),
                 other => anyhow::bail!("unsupported graph provider: {other}"),
@@ -243,6 +250,11 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_else(|| "superops-logs".into()),
         storage,
         k8s_endpoint: Arc::new(RwLock::new(config.services.k8s.endpoint.clone())),
+        k8s_token: config.services.k8s.token.clone(),
+        audit_fallback_dir: config.audit.fallback_dir.clone(),
+        blacklist: Arc::new(crate::auth::blacklist::BlacklistStore::connect(
+            &config.redis.url,
+        )),
         api_keys: Arc::new(crate::model::api_key::ApiKeyStore::new(pool.clone())),
         pool: pool.clone(),
         approval_enabled: config.approval.enabled,
@@ -326,8 +338,8 @@ async fn main() -> anyhow::Result<()> {
                     ));
                 }
                 if let Some(etcd) = &cfg.etcd {
-                    let registry = EtcdRegistry::new(etcd.endpoints.clone(), &etcd.prefix)
-                        .lease_ttl(30);
+                    let registry =
+                        EtcdRegistry::new(etcd.endpoints.clone(), &etcd.prefix).lease_ttl(30);
                     let info = ServiceInfo::new("superops-gateway", env!("CARGO_PKG_VERSION"))
                         .with_endpoint(format!("http://localhost:{}", cfg.server.http_port));
                     let registration = registry.register(info).await?;

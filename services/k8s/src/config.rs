@@ -8,6 +8,8 @@ pub struct Config {
     #[allow(dead_code)]
     pub database: DatabaseConfig,
     #[serde(default)]
+    pub auth: AuthConfig,
+    #[serde(default)]
     pub consul: Option<ConsulConfig>,
     #[serde(default)]
     pub otlp: Option<String>,
@@ -16,6 +18,13 @@ pub struct Config {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ServerConfig {
     pub grpc_port: u16,
+}
+
+/// 服务间鉴权：`token` 非空时启用，所有 gRPC 请求须携带 `authorization: Bearer <token>`。
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct AuthConfig {
+    #[serde(default)]
+    pub token: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]

@@ -50,8 +50,8 @@ async fn main() -> anyhow::Result<()> {
             let mq = mq_start.clone();
             async move {
                 if let Some(etcd) = &cfg.etcd {
-                    let registry = EtcdRegistry::new(etcd.endpoints.clone(), &etcd.prefix)
-                        .lease_ttl(30);
+                    let registry =
+                        EtcdRegistry::new(etcd.endpoints.clone(), &etcd.prefix).lease_ttl(30);
                     let info = ServiceInfo::new("superops-collector", env!("CARGO_PKG_VERSION"));
                     let registration = registry.register(info).await?;
                     tracing::info!(service = "superops-collector", "registered in etcd");

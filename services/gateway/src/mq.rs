@@ -47,11 +47,13 @@ mod tests {
     #[test]
     fn all_optional_default_to_none() {
         let cfg: Config = serde_yaml::from_str(base_yaml()).unwrap();
-        assert!(cfg.mqtt.is_none()
-            && cfg.nats.is_none()
-            && cfg.graph.is_none()
-            && cfg.search.is_none()
-            && cfg.storage.is_none()
-            && cfg.etcd.is_none());
+        assert!(
+            cfg.mqtt.is_none()
+                && cfg.nats.is_none()
+                && cfg.graph.is_none()
+                && cfg.search.is_none()
+                && cfg.storage.is_none()
+                && cfg.etcd.is_none()
+        );
     }
 }

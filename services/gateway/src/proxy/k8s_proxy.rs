@@ -85,11 +85,13 @@ type ApiResult<T> = Result<Json<T>, (StatusCode, Json<serde_json::Value>)>;
 async fn connect_client(
     state: &crate::AppState,
 ) -> Result<
-    superops_protos::k8s::v1::k8s_service_client::K8sServiceClient<tonic::transport::Channel>,
+    superops_protos::k8s::v1::k8s_service_client::K8sServiceClient<
+        crate::k8s_client::BearerChannel,
+    >,
     (StatusCode, Json<serde_json::Value>),
 > {
     let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
-    superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
+    crate::k8s_client::connect(&endpoint, &state.k8s_token)
         .await
         .map_err(|e| {
             (
@@ -384,13 +386,6 @@ pub(crate) fn status_to_http(e: tonic::Status) -> (StatusCode, Json<serde_json::
     (code, Json(serde_json::json!({ "error": e.message() })))
 }
 
-fn now_secs() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
-
 fn client_ip(headers: &HeaderMap) -> String {
     headers
         .get("x-forwarded-for")
@@ -410,41 +405,6 @@ pub(crate) fn claims_username(claims: &AuthClaims) -> &str {
         .unwrap_or("unknown")
 }
 
-/// 发布审计事件，与 auth/handler.rs 的 publish_audit 同构；失败仅告警，绝不阻塞主流程。
-async fn publish_audit(
-    state: &crate::AppState,
-    event_type: &str,
-    username: &str,
-    ip: &str,
-    detail: &str,
-    extra: &serde_json::Value,
-) {
-    if let Some(mq) = &state.mq {
-        let mut payload = serde_json::json!({
-            "ts": now_secs(),
-            "event_type": event_type,
-            "level": "INFO",
-            "username": username,
-            "ip": ip,
-            "detail": detail,
-        });
-        if let Some(extra_obj) = extra.as_object() {
-            for (k, v) in extra_obj {
-                payload[k] = v.clone();
-            }
-        }
-        if let Err(e) = mq
-            .publish(
-                "superops.audit",
-                &serde_json::to_vec(&payload).unwrap_or_default(),
-            )
-            .await
-        {
-            tracing::warn!("audit publish failed: {e}");
-        }
-    }
-}
-
 async fn scale_deployment(
     State(state): State<crate::AppState>,
     Extension(claims): Extension<AuthClaims>,
@@ -459,15 +419,14 @@ async fn scale_deployment(
         )
     })?;
     let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
-    let mut client =
-        superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::BAD_GATEWAY,
-                    Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
-                )
-            })?;
+    let mut client = crate::k8s_client::connect(&endpoint, &state.k8s_token)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
+            )
+        })?;
     let resp = client
         .scale_deployment(superops_protos::k8s::v1::ScaleDeploymentRequest {
             cluster_id: cid.clone(),
@@ -478,7 +437,7 @@ async fn scale_deployment(
         .await
         .map_err(status_to_http)?
         .into_inner();
-    publish_audit(
+    crate::audit::publish(
         &state,
         "k8s.scale",
         claims_username(&claims),
@@ -504,15 +463,14 @@ async fn restart_deployment(
     Path((cid, ns, name)): Path<(String, String, String)>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
-    let mut client =
-        superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::BAD_GATEWAY,
-                    Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
-                )
-            })?;
+    let mut client = crate::k8s_client::connect(&endpoint, &state.k8s_token)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
+            )
+        })?;
     let _resp = client
         .restart_deployment(superops_protos::k8s::v1::RestartDeploymentRequest {
             cluster_id: cid.clone(),
@@ -521,7 +479,7 @@ async fn restart_deployment(
         })
         .await
         .map_err(status_to_http)?;
-    publish_audit(
+    crate::audit::publish(
         &state,
         "k8s.restart",
         claims_username(&claims),
@@ -558,15 +516,14 @@ async fn update_deployment_image(
             )
         })?;
     let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
-    let mut client =
-        superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::BAD_GATEWAY,
-                    Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
-                )
-            })?;
+    let mut client = crate::k8s_client::connect(&endpoint, &state.k8s_token)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
+            )
+        })?;
     let resp = client
         .update_deployment_image(superops_protos::k8s::v1::UpdateDeploymentImageRequest {
             cluster_id: cid.clone(),
@@ -577,7 +534,7 @@ async fn update_deployment_image(
         .await
         .map_err(status_to_http)?
         .into_inner();
-    publish_audit(
+    crate::audit::publish(
         &state,
         "k8s.update-image",
         claims_username(&claims),
@@ -604,37 +561,29 @@ async fn delete_deployment(
 ) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
     // P6-1: 审批门禁 — enabled 时删除需先通过审批（kind='delete' 且 status='approved'）。
     // target 约定为 "{cluster_id}/{ns}/{name}"，避免跨集群同名 deployment 绕过门禁。
-    if state.approval_enabled {
-        let approved =
-            crate::model::approval::is_delete_approved(&state.pool, &format!("{cid}/{ns}/{name}"))
-                .await
-                .map_err(|e| {
-                    (
-                        StatusCode::BAD_GATEWAY,
-                        Json(serde_json::json!({
-                            "error": format!("approval check failed: {e}")
-                        })),
-                    )
-                })?;
-        if !approved {
-            return Err((
-                StatusCode::PRECONDITION_FAILED,
-                Json(serde_json::json!({
-                    "error": "删除需先通过审批 (POST /api/approvals)"
-                })),
-            ));
-        }
+    if let Err((code, msg)) = crate::model::approval::check_delete_approval(
+        Some(&state.pool),
+        state.approval_enabled,
+        &cid,
+        &ns,
+        &name,
+    )
+    .await
+    {
+        return Err((
+            StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            Json(serde_json::json!({ "error": msg })),
+        ));
     }
     let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
-    let mut client =
-        superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::BAD_GATEWAY,
-                    Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
-                )
-            })?;
+    let mut client = crate::k8s_client::connect(&endpoint, &state.k8s_token)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
+            )
+        })?;
     client
         .delete_deployment(superops_protos::k8s::v1::DeleteDeploymentRequest {
             cluster_id: cid.clone(),
@@ -643,7 +592,7 @@ async fn delete_deployment(
         })
         .await
         .map_err(status_to_http)?;
-    publish_audit(
+    crate::audit::publish(
         &state,
         "k8s.delete",
         claims_username(&claims),

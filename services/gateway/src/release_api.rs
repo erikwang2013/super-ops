@@ -71,19 +71,16 @@ pub async fn create_release_handler(
             .into_response();
     }
     let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
-    let mut client =
-        match superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
-            .await
-        {
-            Ok(c) => c,
-            Err(e) => {
-                return (
-                    StatusCode::BAD_GATEWAY,
-                    Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
-                )
-                    .into_response();
-            }
-        };
+    let mut client = match crate::k8s_client::connect(&endpoint, &state.k8s_token).await {
+        Ok(c) => c,
+        Err(e) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
+            )
+                .into_response();
+        }
+    };
     let update = client
         .update_deployment_image(superops_protos::k8s::v1::UpdateDeploymentImageRequest {
             cluster_id: req.cluster_id.clone(),
@@ -162,19 +159,16 @@ pub async fn rollback_release_handler(
             .into_response();
     }
     let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
-    let mut client =
-        match superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
-            .await
-        {
-            Ok(c) => c,
-            Err(e) => {
-                return (
-                    StatusCode::BAD_GATEWAY,
-                    Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
-                )
-                    .into_response();
-            }
-        };
+    let mut client = match crate::k8s_client::connect(&endpoint, &state.k8s_token).await {
+        Ok(c) => c,
+        Err(e) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
+            )
+                .into_response();
+        }
+    };
     let update = client
         .update_deployment_image(superops_protos::k8s::v1::UpdateDeploymentImageRequest {
             cluster_id: rel.cluster_id.clone(),

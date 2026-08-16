@@ -172,26 +172,23 @@ pub async fn run_runbook_handler(
         }
     };
     let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
-    let client =
-        match superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
-            .await
-        {
-            Ok(c) => c,
-            Err(e) => {
-                let _ = mark_runbook_run(
-                    &state.pool,
-                    run_id,
-                    "failed",
-                    &format!("k8s backend unreachable: {e}"),
-                )
-                .await;
-                return (
-                    StatusCode::BAD_GATEWAY,
-                    Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
-                )
-                    .into_response();
-            }
-        };
+    let client = match crate::k8s_client::connect(&endpoint, &state.k8s_token).await {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = mark_runbook_run(
+                &state.pool,
+                run_id,
+                "failed",
+                &format!("k8s backend unreachable: {e}"),
+            )
+            .await;
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(serde_json::json!({ "error": format!("k8s backend unreachable: {e}") })),
+            )
+                .into_response();
+        }
+    };
     let mut client = client;
     let mut output = String::new();
     for (i, step) in steps.iter().enumerate() {

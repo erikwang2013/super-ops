@@ -45,11 +45,10 @@ pub fn build_schema(state: AppState) -> GraphQLSchema {
                     let sql = "SELECT level, title, message, \
                                formatDateTime(toDateTime(timestamp), '%Y-%m-%d %H:%i:%s') AS ts \
                                FROM alert_event ORDER BY timestamp DESC LIMIT 100";
-                    let rows = s
-                        .ch
-                        .query(sql)
-                        .await
-                        .map_err(|e| format!("alerts query failed: {e}"))?;
+                    let rows =
+                        s.ch.query(sql)
+                            .await
+                            .map_err(|e| format!("alerts query failed: {e}"))?;
                     let alerts: Vec<serde_json::Value> = rows
                         .iter()
                         .map(|r| {

@@ -12,6 +12,10 @@ pub trait MessageQueue: Send + Sync {
 
 pub trait MessageStream: Send + Unpin {
     fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Vec<u8>, MqError>>>;
+
+    /// 消费方确认最近一次 poll 的消息已处理完成。
+    /// Kafka 后端执行手动 offset commit（at-least-once）；内存/MQTT/NATS/RabbitMQ 等无持久游标后端为 no-op。
+    fn commit(&mut self) {}
 }
 
 #[derive(Debug, thiserror::Error)]

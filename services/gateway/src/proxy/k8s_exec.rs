@@ -57,13 +57,10 @@ async fn exec_socket(
     let rec_session = crate::recorder::session_id();
     let rec_node = format!("{ns}/{pod}");
 
-    let mut client =
-        match superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
-            .await
-        {
-            Ok(c) => c,
-            Err(e) => return send_error(socket, &format!("k8s backend unreachable: {e}")).await,
-        };
+    let mut client = match crate::k8s_client::connect(&endpoint, &state.k8s_token).await {
+        Ok(c) => c,
+        Err(e) => return send_error(socket, &format!("k8s backend unreachable: {e}")).await,
+    };
     let (req_tx, req_rx) = mpsc::channel::<ExecRequest>(64);
     // 先入队初始化消息再发起双向流：服务端 handler 会先读第一个消息才返回响应头，
     // 若在 exec_pod().await 之后才 send 会造成客户端等响应头、服务端等首消息的死锁

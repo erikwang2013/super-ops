@@ -313,10 +313,11 @@ async fn record_selfheal(
 /// 巡检后执行自愈（cfg.selfheal.enabled 开启时）；动作成功/失败均写 alert_event 审计
 async fn execute_selfheal(
     cfg: &Config,
-    client: &mut K8sServiceClient<tonic::transport::Channel>,
+    client: &mut K8sServiceClient<crate::cluster::BearerChannel>,
     deps: &[Deployment],
     ch: &dyn ecat_data::TsdbClient,
     rules: &[AlertRule],
+    cluster_id: &str,
 ) {
     let targets = selfheal_targets(rules, deps, cfg.selfheal.max_actions_per_cycle);
     if targets.is_empty() {
@@ -327,7 +328,7 @@ async fn execute_selfheal(
         let out: Result<(), tonic::Status> = if action == "restart" {
             client
                 .restart_deployment(superops_protos::k8s::v1::RestartDeploymentRequest {
-                    cluster_id: cfg.selfheal.cluster_id.clone(),
+                    cluster_id: cluster_id.to_string(),
                     namespace: ns.clone(),
                     name: name.clone(),
                 })
@@ -341,7 +342,7 @@ async fn execute_selfheal(
                 .unwrap_or(1);
             client
                 .scale_deployment(superops_protos::k8s::v1::ScaleDeploymentRequest {
-                    cluster_id: cfg.selfheal.cluster_id.clone(),
+                    cluster_id: cluster_id.to_string(),
                     namespace: ns.clone(),
                     name: name.clone(),
                     replicas,
@@ -464,19 +465,31 @@ pub async fn inspect_once(cfg: &Config) -> anyhow::Result<()> {
 }
 
 async fn inspect_work(cfg: &Config) -> anyhow::Result<()> {
-    let mut client = K8sServiceClient::connect(cfg.k8s.endpoint.clone()).await?;
+    let Some(cluster_id) = crate::cluster::resolve_cluster_id(cfg).await? else {
+        tracing::warn!("no registered cluster; skipping inspect round");
+        return Ok(());
+    };
+    let mut client = crate::cluster::k8s_client(cfg).await?;
     let nodes = client
-        .list_nodes(ListNodesRequest::default())
+        .list_nodes(ListNodesRequest {
+            cluster_id: cluster_id.clone(),
+        })
         .await?
         .into_inner()
         .nodes;
     let pods = client
-        .list_pods(ListPodsRequest::default())
+        .list_pods(ListPodsRequest {
+            cluster_id: cluster_id.clone(),
+            ..Default::default()
+        })
         .await?
         .into_inner()
         .pods;
     let deps = client
-        .list_deployments(ListDeploymentsRequest::default())
+        .list_deployments(ListDeploymentsRequest {
+            cluster_id: cluster_id.clone(),
+            ..Default::default()
+        })
         .await?
         .into_inner()
         .deployments;
@@ -492,14 +505,10 @@ async fn inspect_work(cfg: &Config) -> anyhow::Result<()> {
     ecat_data::TsdbClient::write(ch.as_ref(), &points).await?;
     // 领域事件：告警同步广播到事件总线（gateway 端落 ClickHouse domain_event）
     for a in &health.alerts {
-        let event = superops_protos::events::DomainEvent::new(
-            "alert",
-            &a.level,
-            &a.title,
-            &a.message,
-        )
-        .with_detail(serde_json::json!({ "node": a.node }))
-        .with_ts(now_secs());
+        let event =
+            superops_protos::events::DomainEvent::new("alert", &a.level, &a.title, &a.message)
+                .with_detail(serde_json::json!({ "node": a.node }))
+                .with_ts(now_secs());
         if let Err(e) = crate::domain_events::publish_domain_event(cfg, &event).await {
             tracing::warn!("alert domain event publish failed: {e}");
         }
@@ -538,7 +547,7 @@ async fn inspect_work(cfg: &Config) -> anyhow::Result<()> {
         }
     }
     if cfg.selfheal.enabled {
-        execute_selfheal(cfg, &mut client, &deps, ch.as_ref(), &rules).await;
+        execute_selfheal(cfg, &mut client, &deps, ch.as_ref(), &rules, &cluster_id).await;
     }
     Ok(())
 }

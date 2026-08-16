@@ -3,7 +3,6 @@ use crate::ch::{clickhouse_from, now_secs};
 use crate::config::Config;
 use ecat_data::{DataPoint, FieldValue, TsdbClient};
 use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions};
-use superops_protos::k8s::v1::k8s_service_client::K8sServiceClient;
 
 /// 配置漂移：集群里存在但 CMDB 未登记（或 status != active）的 deployment。
 /// 对比输入为 CMDB 登记的 deployment 名集合（仅 active）与集群实际 deployment 名集合。
@@ -58,9 +57,16 @@ pub async fn drift_once(cfg: &Config) -> anyhow::Result<()> {
     .await
     .map_err(|e| anyhow::anyhow!("cmdb_asset query failed: {e}"))?;
 
-    let mut client = K8sServiceClient::connect(cfg.k8s.endpoint.clone()).await?;
+    let Some(cluster_id) = crate::cluster::resolve_cluster_id(cfg).await? else {
+        tracing::warn!("no registered cluster; skipping drift round");
+        return Ok(());
+    };
+    let mut client = crate::cluster::k8s_client(cfg).await?;
     let deps = client
-        .list_deployments(superops_protos::k8s::v1::ListDeploymentsRequest::default())
+        .list_deployments(superops_protos::k8s::v1::ListDeploymentsRequest {
+            cluster_id: cluster_id.clone(),
+            ..Default::default()
+        })
         .await?
         .into_inner()
         .deployments;

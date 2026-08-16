@@ -219,7 +219,7 @@ pub async fn run_script_handler(
     let job_name = format!("superops-script-{script_id}-{run_id}");
     let command = build_runner_command(&pods, &content);
     let endpoint = { state.k8s_endpoint.read().unwrap().clone() };
-    let client = superops_protos::k8s::v1::k8s_service_client::K8sServiceClient::connect(endpoint)
+    let client = crate::k8s_client::connect(&endpoint, &state.k8s_token)
         .await
         .map_err(|e| {
             (

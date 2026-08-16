@@ -10,7 +10,7 @@ use ecat_mq::MessageQueue;
 use futures::future::poll_fn;
 use serde::Deserialize;
 use std::sync::Arc;
-use superops_protos::events::{event_topic, DomainEvent};
+use superops_protos::events::{DomainEvent, event_topic};
 
 fn now_secs() -> i64 {
     std::time::SystemTime::now()
@@ -45,11 +45,9 @@ pub async fn consume_domain_events(
         match msg {
             Ok(payload) => match serde_json::from_slice::<DomainEvent>(&payload) {
                 Ok(event) => {
-                    if let Err(e) = ecat_data::TsdbClient::write(
-                        ch.as_ref(),
-                        &[domain_event_to_point(&event)],
-                    )
-                    .await
+                    if let Err(e) =
+                        ecat_data::TsdbClient::write(ch.as_ref(), &[domain_event_to_point(&event)])
+                            .await
                     {
                         tracing::warn!(error = %e, "domain event write failed");
                     }
@@ -100,7 +98,11 @@ pub async fn list_domain_events(
                     serde_json::Value::Object(m)
                 })
                 .collect();
-            (StatusCode::OK, Json(serde_json::json!({ "events": events }))).into_response()
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({ "events": events })),
+            )
+                .into_response()
         }
         Err(e) => (
             StatusCode::BAD_GATEWAY,

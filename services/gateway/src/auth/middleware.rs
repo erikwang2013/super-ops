@@ -22,7 +22,7 @@ impl AuthState {
         Self { config }
     }
 
-    /// 签发 JWT：委托框架 ecat-auth 的 HS256 签发（sub + username 附加 claim + role）。
+    /// 签发 JWT：委托框架 ecat-auth 的 HS256 签发（sub + username 附加 claim + role + jti）。
     pub fn create_token(
         &self,
         user_id: &str,
@@ -35,10 +35,16 @@ impl AuthState {
             exp: None,
             iat: None,
             role: role.map(String::from),
-            extra: [(
-                "username".to_string(),
-                serde_json::Value::String(username.to_string()),
-            )]
+            extra: [
+                (
+                    "username".to_string(),
+                    serde_json::Value::String(username.to_string()),
+                ),
+                (
+                    "jti".to_string(),
+                    serde_json::Value::String(uuid::Uuid::new_v4().to_string()),
+                ),
+            ]
             .into_iter()
             .collect(),
         };

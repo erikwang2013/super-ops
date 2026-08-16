@@ -48,11 +48,17 @@ pub async fn consume_audit(mq: Arc<dyn MessageQueue>, cfg: &Config) -> anyhow::R
             Ok(payload) => match serde_json::from_slice::<AuditEvent>(&payload) {
                 Ok(event) => {
                     let point = audit_to_data_point(&event);
-                    if let Err(e) = ecat_data::TsdbClient::write(ch.as_ref(), &[point]).await {
-                        tracing::warn!("audit write failed: {e}");
+                    match ecat_data::TsdbClient::write(ch.as_ref(), &[point]).await {
+                        // 写入成功才提交 offset（at-least-once：失败不提交，重启重放不丢审计）
+                        Ok(_) => stream.commit(),
+                        Err(e) => tracing::warn!("audit write failed: {e}"),
                     }
                 }
-                Err(e) => tracing::warn!("audit parse failed: {e}"),
+                Err(e) => {
+                    // 坏消息无法重放，跳过该条
+                    tracing::warn!("audit parse failed: {e}");
+                    stream.commit();
+                }
             },
             Err(e) => tracing::warn!("audit recv failed: {e}"),
         }

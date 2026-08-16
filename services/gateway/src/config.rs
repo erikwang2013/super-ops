@@ -31,6 +31,8 @@ pub struct Config {
     #[serde(default)]
     pub approval: ApprovalConfig,
     #[serde(default)]
+    pub rate_limit: RateLimitConfig,
+    #[serde(default)]
     pub recording: RecordingConfig,
     #[serde(default)]
     pub terminal: TerminalConfig,
@@ -40,6 +42,34 @@ pub struct Config {
     pub search: Option<SearchConfig>,
     #[serde(default)]
     pub storage: Option<S3Config>,
+    #[serde(default)]
+    pub audit: AuditConfig,
+}
+
+/// 审计可靠性配置：MQ 缺失/失败时落本地 JSONL 兜底目录。
+#[derive(Debug, Deserialize, Clone)]
+pub struct AuditConfig {
+    #[serde(default = "default_audit_dir")]
+    pub fallback_dir: String,
+}
+
+/// 登录限流键策略：默认取真实对端 IP（ConnectInfo）；`trust_proxy` 时信任反向代理头。
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct RateLimitConfig {
+    #[serde(default)]
+    pub trust_proxy: bool,
+}
+
+fn default_audit_dir() -> String {
+    "data/audit".into()
+}
+
+impl Default for AuditConfig {
+    fn default() -> Self {
+        Self {
+            fallback_dir: default_audit_dir(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -176,6 +206,10 @@ pub struct ServicesConfig {
 pub struct K8sServiceConfig {
     #[allow(dead_code)]
     pub endpoint: String,
+    /// 服务间访问 k8s-service 的 Bearer 令牌（与 k8s-service.yaml `auth.token` 一致）。
+    /// 空 = 明文连接（本地开发），非空 = 每次 gRPC 请求注入 `authorization: Bearer <token>`。
+    #[serde(default)]
+    pub token: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
