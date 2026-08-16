@@ -1,7 +1,8 @@
 use crate::ch::{clickhouse_from, now_secs};
 use crate::config::Config;
+use ecat_data::Cache as _;
 use ecat_data::{DataPoint, FieldValue};
-use ecat_data_redis::RedisLock;
+use ecat_data_redis::{RedisCache, RedisLock};
 use sqlx::mysql::{MySqlConnectOptions, MySqlPool, MySqlPoolOptions};
 use superops_protos::k8s::v1::k8s_service_client::K8sServiceClient;
 use superops_protos::k8s::v1::{
@@ -197,15 +198,79 @@ pub fn evaluate_rule(
     alerts
 }
 
+/// 连续超标计数推进：返回 (是否达到连续阈值, 新计数)。
+/// `consecutive=1` 时任何超标立即通过（等价于未开启降噪）。
+pub fn streak_progress(current: i64, consecutive: u64) -> (bool, i64) {
+    let next = current + 1;
+    (next >= consecutive as i64, next)
+}
+
+/// 告警降噪：Redis streak 计数过滤，连续 `consecutive` 个周期超标才放行。
+/// 键 TTL 超时自动重置（告警中断后自动归零）；Redis 不可用时降级为全放行（保告警不丢）。
+async fn filter_by_streak(
+    cfg: &Config,
+    alerts: &[AlertEvent],
+    consecutive: u64,
+    ttl: std::time::Duration,
+) -> Vec<AlertEvent> {
+    if consecutive <= 1 {
+        return alerts.to_vec();
+    }
+    let cache = match RedisCache::from_config(cfg.lock.clone()).await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!(error = %e, "alert streak cache unavailable; bypassing dedup");
+            return alerts.to_vec();
+        }
+    };
+    let mut out = Vec::new();
+    for alert in alerts {
+        let key = format!(
+            "alert:streak:{}:{}",
+            alert.title,
+            alert.node.as_deref().unwrap_or("-")
+        );
+        let cur: i64 = cache
+            .get(&key)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|b| String::from_utf8(b).ok())
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        let (pass, next) = streak_progress(cur, consecutive);
+        if let Err(e) = cache.set(&key, next.to_string().as_bytes(), ttl).await {
+            tracing::warn!(error = %e, key, "streak set failed");
+        }
+        if pass {
+            out.push(alert.clone());
+        }
+    }
+    out
+}
+
 pub fn evaluate_rules(
     rules: &[AlertRule],
     nodes: &[Node],
     pods: &[Pod],
     deps: &[Deployment],
+    max_not_ready: usize,
 ) -> ClusterHealth {
     let mut alerts = Vec::new();
     for rule in rules {
-        alerts.extend(evaluate_rule(rule, nodes, pods, deps));
+        let mut ra = evaluate_rule(rule, nodes, pods, deps);
+        // 节点级告警风暴截断：单规则节点告警数超过 max_not_ready 时保留前 N 条 + 汇总一条
+        if rule.metric == "node_not_ready" && ra.len() > max_not_ready {
+            let total = ra.len();
+            ra.truncate(max_not_ready);
+            ra.push(AlertEvent {
+                level: rule.level.clone(),
+                title: rule.name.clone(),
+                message: format!("{total} 个节点未就绪（超上限 {max_not_ready}，已截断展示）"),
+                node: None,
+            });
+        }
+        alerts.extend(ra);
     }
     let not_ready = nodes.iter().filter(|n| n.status != "Ready").count();
     ClusterHealth {
@@ -495,16 +560,69 @@ async fn inspect_work(cfg: &Config) -> anyhow::Result<()> {
         .deployments;
 
     let rules = resolve_rules(cfg).await;
-    let health = evaluate_rules(&rules, &nodes, &pods, &deps);
-    // 旧实现用 cluster_ok 短路（节点全 Ready 时吞掉 pod/deployment 告警），规则引擎只按告警有无判定
-    if health.alerts.is_empty() {
+    let health = evaluate_rules(&rules, &nodes, &pods, &deps, cfg.collector.max_not_ready);
+    // 降噪：连续 N 周期超标才告警（alert_consecutive，Redis streak 计数，TTL 超时自动重置）
+    let consecutive = cfg.collector.alert_consecutive.max(1) as u64;
+    let streak_ttl = std::time::Duration::from_secs(
+        cfg.collector
+            .inspect_interval_secs
+            .saturating_mul(consecutive + 2),
+    );
+    let alerts = filter_by_streak(cfg, &health.alerts, consecutive, streak_ttl).await;
+    // 告警去重：open 状态窗口内同一目标不重复落库（Redis 键 TTL 自动过期 ≈ 恢复清除）
+    let open_ttl = streak_ttl;
+    let http = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .unwrap_or_default();
+    // 值班联动：查一次当前值班人，追加进通知；库不可达仅告警不阻断
+    let oncall = oncall_assignee(cfg).await;
+    if let Ok(cache) = RedisCache::from_config(cfg.lock.clone()).await {
+        let mut deduped = Vec::new();
+        for a in &alerts {
+            let key = format!(
+                "alert:open:{}:{}",
+                a.title,
+                a.node.as_deref().unwrap_or("-")
+            );
+            if cache.get(&key).await.ok().flatten().is_some() {
+                continue; // 已 open，跳过重复写入
+            }
+            deduped.push(a.clone());
+            if let Err(e) = cache.set(&key, b"1".as_slice(), open_ttl).await {
+                tracing::warn!(error = %e, key, "alert open set failed");
+            }
+        }
+        // 去重后为空说明均为已 open 告警，本周期无需写入/通知
+        if deduped.is_empty() {
+            return Ok(());
+        }
+        let alerts = deduped;
+        // 旧实现用 cluster_ok 短路（节点全 Ready 时吞掉 pod/deployment 告警），规则引擎只按告警有无判定
+        let ch = clickhouse_from(cfg)?;
+        let points = health_to_points(&alerts, now_secs());
+        ecat_data::TsdbClient::write(ch.as_ref(), &points).await?;
+        // 领域事件：告警同步广播到事件总线（gateway 端落 ClickHouse domain_event）
+        for a in &alerts {
+            let event =
+                superops_protos::events::DomainEvent::new("alert", &a.level, &a.title, &a.message)
+                    .with_detail(serde_json::json!({ "node": a.node }))
+                    .with_ts(now_secs());
+            if let Err(e) = crate::domain_events::publish_domain_event(cfg, &event).await {
+                tracing::warn!("alert domain event publish failed: {e}");
+            }
+        }
+        notify_alerts(cfg, &alerts, &http, oncall.as_deref()).await;
+        if cfg.selfheal.enabled {
+            execute_selfheal(cfg, &mut client, &deps, ch.as_ref(), &rules, &cluster_id).await;
+        }
         return Ok(());
     }
+    // Redis 不可用：降级为直接写入（不丢告警）
     let ch = clickhouse_from(cfg)?;
-    let points = health_to_points(&health.alerts, now_secs());
+    let points = health_to_points(&alerts, now_secs());
     ecat_data::TsdbClient::write(ch.as_ref(), &points).await?;
-    // 领域事件：告警同步广播到事件总线（gateway 端落 ClickHouse domain_event）
-    for a in &health.alerts {
+    for a in &alerts {
         let event =
             superops_protos::events::DomainEvent::new("alert", &a.level, &a.title, &a.message)
                 .with_detail(serde_json::json!({ "node": a.node }))
@@ -513,17 +631,23 @@ async fn inspect_work(cfg: &Config) -> anyhow::Result<()> {
             tracing::warn!("alert domain event publish failed: {e}");
         }
     }
+    notify_alerts(cfg, &alerts, &http, oncall.as_deref()).await;
+    if cfg.selfheal.enabled {
+        execute_selfheal(cfg, &mut client, &deps, ch.as_ref(), &rules, &cluster_id).await;
+    }
+    Ok(())
+}
 
-    let http = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
-        .build()
-        .unwrap_or_default();
-    // 值班联动：查一次当前值班人，追加进通知；库不可达仅告警不阻断
-    let oncall = oncall_assignee(cfg).await;
+/// 告警通知分发（webhook/SMTP），去重后的告警按 target 静默窗口过滤
+async fn notify_alerts(
+    cfg: &Config,
+    alerts: &[AlertEvent],
+    http: &reqwest::Client,
+    oncall: Option<&str>,
+) {
     for t in &cfg.notify.targets {
         let mut silencer = crate::notify::NotifySilencer::default();
-        let fresh: Vec<AlertEvent> = health
-            .alerts
+        let fresh: Vec<AlertEvent> = alerts
             .iter()
             .filter(|e| {
                 let key = format!("{}:{}", e.title, e.node.as_deref().unwrap_or(""));
@@ -534,22 +658,12 @@ async fn inspect_work(cfg: &Config) -> anyhow::Result<()> {
         if fresh.is_empty() {
             continue;
         }
-        if let Err(e) = crate::notify::dispatch_with_oncall(
-            t,
-            &fresh,
-            &http,
-            cfg.smtp.as_ref(),
-            oncall.as_deref(),
-        )
-        .await
+        if let Err(e) =
+            crate::notify::dispatch_with_oncall(t, &fresh, http, cfg.smtp.as_ref(), oncall).await
         {
             tracing::warn!("notify target {} failed: {e}", t.name);
         }
     }
-    if cfg.selfheal.enabled {
-        execute_selfheal(cfg, &mut client, &deps, ch.as_ref(), &rules, &cluster_id).await;
-    }
-    Ok(())
 }
 
 /// 查询当前值班人；mysql 未配置或查询失败返回 None（联动失败不阻断告警）

@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.8.9] — 2026-08-16 — 阶段二：告警状态机降噪（alert_consecutive 接线 + open 去重 + 节点告警上限）
+
+### Added
+- **`alert_consecutive` 接线（P1，此前配置字段从未使用）**：`streak_progress` 纯函数 + `filter_by_streak`（Redis `alert:streak:*` 计数，连续 N 个周期超标才告警，TTL 超时自动重置；Redis 不可用降级全放行）
+- **告警 open 去重**：写入 ClickHouse 前查 Redis `alert:open:*`，同一目标在 open 窗口内不重复落库/通知（TTL 自动过期 ≈ 恢复清除）
+- **节点告警风暴上限**：`evaluate_rules` 增加 `max_not_ready` 参数，node_not_ready 告警超限保留前 N 条 + 汇总一条（原规则引擎不生效，故障时逐节点轰炸）
+- 通知/自愈路径重构：`notify_alerts` 提取，去重后的告警才触发通知与自愈
+
+### Verified
+- 新测试 ×2（streak_progress 连续阈值 / evaluate_rules 节点告警截断）；workspace 441 → 443 全过；clippy `-D warnings` 零警告；fmt 通过
+
 ## [1.8.8] — 2026-08-16 — 阶段二：集群注册持久化（Phase 2 persistence）
 
 ### Added

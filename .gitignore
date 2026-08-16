@@ -2,7 +2,7 @@
 /.vscode
 *.log
 .env
-tests
+/tests
 /.cursor
 .claude
 .claude-flow
