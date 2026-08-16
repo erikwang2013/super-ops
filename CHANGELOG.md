@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.10] — 2026-08-16 — 阶段二：自愈冷却 + 周期任务分布式锁
+
+### Added
+- **自愈冷却（P1）**：`SelfhealConfig` 新增 `cooldown_secs`（默认 300，Redis `selfheal:cooldown:*` 冷却键，冷却期内同 deployment 不重复 restart/scale）与 `max_replicas`（默认 50，scale 副本上限防无限扩容）；Redis 不可用降级执行
+- **周期任务分布式锁（P1）**：`with_task_lock`（key 参数化）抽出；drift/rollback/housekeeping 接入 Redis 锁（`superops:drift|rollback|housekeeping:lock`），多 collector 实例下只执行一次（防重复漂移告警/双重回滚/重复备份+剪枝竞态）
+
+### Verified
+- 新测试 ×1（task lock 常量）；workspace 443 → 444 全过；clippy `-D warnings` 零警告；fmt 通过
+
 ## [1.8.9] — 2026-08-16 — 阶段二：告警状态机降噪（alert_consecutive 接线 + open 去重 + 节点告警上限）
 
 ### Added

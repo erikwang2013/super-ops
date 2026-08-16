@@ -196,7 +196,7 @@ Infra passwords are injected via `deploy/.env` (template: `deploy/.env.example`)
 
 ## Tests & CI
 
-- 443 workspace unit/integration tests, all passing (gateway 114 / k8s 18 / collector 64 / ecat crates; see the test matrix in `docs/audit-report-2026-08-06.md`)
+- 444 workspace unit/integration tests, all passing (gateway 114 / k8s 18 / collector 65 / ecat crates; see the test matrix in `docs/audit-report-2026-08-06.md`)
 - E2E & security: login/register, k8s route happy & error paths, auth bypass, JWT forgery, 429 rate limit, 503 breaker, API Key lifecycle (see `docs/audit-report-2026-08-06.md`)
 - Runtime checks: Consul register/deregister, KV hot reload (threshold 3↔10 both ways), Jaeger spans, Prometheus target up
 - Workspace-wide `cargo clippy --all-targets` has zero warnings; frontend build is warning-free (route-level code splitting + vendor chunking, vendor-antd 786.5kB / index 15.3kB)

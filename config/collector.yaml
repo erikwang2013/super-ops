@@ -72,6 +72,10 @@ selfheal:
   enabled: false
   cluster_id: "default"
   max_actions_per_cycle: 5
+  # 自愈冷却（秒）：每个 deployment 动作后的冷却期，防反复触发
+  cooldown_secs: 300
+  # scale 副本上限：防长期故障下无限扩容
+  max_replicas: 50
 
 # P7-3: 发布自动回滚 — status=ok 的发布在 delay 秒后进入观察窗口，deployment ready==0 或缺失时自动回滚
 rollback:

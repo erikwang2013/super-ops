@@ -214,6 +214,25 @@ pub async fn collect_capacity(cfg: &Config) -> anyhow::Result<()> {
 }
 
 pub async fn housekeeping_once(cfg: &Config) -> anyhow::Result<()> {
+    // 分布式锁：多 collector 实例下只执行一次（防重复备份 + 剪枝竞态、重复容量估算）
+    let lock = ecat_data_redis::RedisLock::from_config(cfg.lock.clone())
+        .await
+        .map_err(|e| anyhow::anyhow!("redis lock config: {e}"))?;
+    match crate::inspect::with_task_lock(&lock, "superops:housekeeping:lock", || {
+        housekeeping_once_inner(cfg)
+    })
+    .await
+    {
+        Ok(Some(out)) => out,
+        Ok(None) => {
+            tracing::debug!("housekeeping skipped: lock held by another instance");
+            Ok(())
+        }
+        Err(e) => Err(anyhow::anyhow!("housekeeping lock: {e}")),
+    }
+}
+
+async fn housekeeping_once_inner(cfg: &Config) -> anyhow::Result<()> {
     if let Some(mysql) = &cfg.mysql {
         backup_mysql(mysql)?;
     }

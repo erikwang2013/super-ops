@@ -36,6 +36,23 @@ fn drift_points(events: &[AlertEvent], ts: i64) -> Vec<DataPoint> {
 /// 周期任务：CMDB deployment 资产 vs 集群实际 deployment，差异写 ClickHouse drift_event。
 /// mysql 未配置时跳过（与值班联动一致，不阻断其他任务）。
 pub async fn drift_once(cfg: &Config) -> anyhow::Result<()> {
+    // 分布式锁：多 collector 实例下只执行一次（防重复漂移告警）
+    let lock = ecat_data_redis::RedisLock::from_config(cfg.lock.clone())
+        .await
+        .map_err(|e| anyhow::anyhow!("redis lock config: {e}"))?;
+    match crate::inspect::with_task_lock(&lock, "superops:drift:lock", || drift_once_inner(cfg))
+        .await
+    {
+        Ok(Some(out)) => out,
+        Ok(None) => {
+            tracing::debug!("drift skipped: lock held by another instance");
+            Ok(())
+        }
+        Err(e) => Err(anyhow::anyhow!("drift lock: {e}")),
+    }
+}
+
+async fn drift_once_inner(cfg: &Config) -> anyhow::Result<()> {
     let Some(mysql) = &cfg.mysql else {
         tracing::debug!("drift check skipped: mysql not configured");
         return Ok(());

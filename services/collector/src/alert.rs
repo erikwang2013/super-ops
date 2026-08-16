@@ -388,8 +388,25 @@ async fn execute_selfheal(
     if targets.is_empty() {
         return;
     }
+    // 冷却与上限：Redis 冷却键 + 副本上限，防反复触发/无限扩容；Redis 不可用时降级执行
+    let cache = match RedisCache::from_config(cfg.lock.clone()).await {
+        Ok(c) => Some(c),
+        Err(e) => {
+            tracing::warn!(error = %e, "selfheal cache unavailable; cooldown disabled");
+            None
+        }
+    };
+    let cooldown_secs = cfg.selfheal.cooldown_secs;
+    let max_replicas = cfg.selfheal.max_replicas;
     tracing::info!(count = targets.len(), "selfheal actions to execute");
     for (ns, name, action) in targets {
+        let cooldown_key = format!("selfheal:cooldown:{ns}:{name}");
+        if let Some(cache) = &cache
+            && cache.get(&cooldown_key).await.ok().flatten().is_some()
+        {
+            tracing::debug!(ns, name, action, "selfheal skipped: in cooldown");
+            continue;
+        }
         let out: Result<(), tonic::Status> = if action == "restart" {
             client
                 .restart_deployment(superops_protos::k8s::v1::RestartDeploymentRequest {
@@ -400,17 +417,27 @@ async fn execute_selfheal(
                 .await
                 .map(|_| ())
         } else if action == "scale" {
-            let replicas = deps
+            let current = deps
                 .iter()
                 .find(|d| d.namespace == ns && d.name == name)
-                .map(|d| d.replicas + 1)
-                .unwrap_or(1);
+                .map(|d| d.replicas)
+                .unwrap_or(0);
+            if current >= max_replicas {
+                tracing::warn!(
+                    ns,
+                    name,
+                    current,
+                    max_replicas,
+                    "selfheal scale skipped: at max replicas"
+                );
+                continue;
+            }
             client
                 .scale_deployment(superops_protos::k8s::v1::ScaleDeploymentRequest {
                     cluster_id: cluster_id.to_string(),
                     namespace: ns.clone(),
                     name: name.clone(),
-                    replicas,
+                    replicas: current + 1,
                 })
                 .await
                 .map(|_| ())
@@ -419,6 +446,15 @@ async fn execute_selfheal(
         };
         match out {
             Ok(_) => {
+                if let Some(cache) = &cache {
+                    let _ = cache
+                        .set(
+                            &cooldown_key,
+                            b"1".as_slice(),
+                            std::time::Duration::from_secs(cooldown_secs),
+                        )
+                        .await;
+                }
                 tracing::info!(ns, name, action, "selfheal executed");
                 record_selfheal(ch, "INFO", &action, &ns, &name, "ok").await;
             }

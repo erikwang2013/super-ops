@@ -53,6 +53,25 @@ async fn pending_releases(
 /// 周期任务：观察窗口内已发布的 deployment 若不可用，自动回滚到 old_image 并落记录。
 /// mysql 未配置时跳过（与值班联动一致，不阻断其他任务）。
 pub async fn rollback_once(cfg: &Config) -> anyhow::Result<()> {
+    // 分布式锁：多 collector 实例下只执行一次（防双重回滚）
+    let lock = ecat_data_redis::RedisLock::from_config(cfg.lock.clone())
+        .await
+        .map_err(|e| anyhow::anyhow!("redis lock config: {e}"))?;
+    match crate::inspect::with_task_lock(&lock, "superops:rollback:lock", || {
+        rollback_once_inner(cfg)
+    })
+    .await
+    {
+        Ok(Some(out)) => out,
+        Ok(None) => {
+            tracing::debug!("rollback skipped: lock held by another instance");
+            Ok(())
+        }
+        Err(e) => Err(anyhow::anyhow!("rollback lock: {e}")),
+    }
+}
+
+async fn rollback_once_inner(cfg: &Config) -> anyhow::Result<()> {
     let Some(mysql) = &cfg.mysql else {
         tracing::debug!("auto rollback skipped: mysql not configured");
         return Ok(());

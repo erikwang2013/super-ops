@@ -134,6 +134,12 @@ pub struct SelfhealConfig {
     pub cluster_id: String,
     #[serde(default = "default_selfheal_max")]
     pub max_actions_per_cycle: usize,
+    /// 每个 deployment 的动作冷却（秒）：冷却期内不重复 restart/scale，防反复触发
+    #[serde(default = "default_selfheal_cooldown")]
+    pub cooldown_secs: u64,
+    /// scale 副本上限：防止长期故障下无限扩容
+    #[serde(default = "default_selfheal_max_replicas")]
+    pub max_replicas: i32,
 }
 
 impl Default for SelfhealConfig {
@@ -142,8 +148,18 @@ impl Default for SelfhealConfig {
             enabled: false,
             cluster_id: default_selfheal_cluster(),
             max_actions_per_cycle: default_selfheal_max(),
+            cooldown_secs: default_selfheal_cooldown(),
+            max_replicas: default_selfheal_max_replicas(),
         }
     }
+}
+
+fn default_selfheal_cooldown() -> u64 {
+    300
+}
+
+fn default_selfheal_max_replicas() -> i32 {
+    50
 }
 
 fn default_selfheal_cluster() -> String {
