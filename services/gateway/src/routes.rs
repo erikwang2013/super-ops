@@ -686,7 +686,12 @@ pub async fn app(
         .layer(
             tower::ServiceBuilder::new()
                 .layer(crate::security::SecurityErrorToResponseLayer)
-                .layer(ecat_security::SecurityBodyLayer::new().body_limit(10 * 1024 * 1024)),
+                .layer(
+                    ecat_security::SecurityBodyLayer::new()
+                        .body_limit(10 * 1024 * 1024)
+                        // 认证凭据端点 body 含 JWT，跳过 WAF 扫描（防 jwt_attack 误判）
+                        .skip_paths(["/api/auth/refresh", "/api/auth/logout"]),
+                ),
         )
         .with_state(state)
         .merge(crate::health::health_router(pool).await))

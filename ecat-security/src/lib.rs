@@ -94,7 +94,12 @@ fn evaluate(results: &[DetectionResult]) -> Option<SecurityError> {
 fn request_parts<B>(req: &Request<B>) -> Vec<String> {
     let mut parts: Vec<String> = Vec::new();
     parts.push(req.uri().to_string());
-    for value in req.headers().values() {
+    for (name, value) in req.headers() {
+        // 认证凭据头（Authorization: Bearer <JWT>）不扫描：JWT 结构会被 security_rust
+        // 判定为 jwt_attack，误伤全部需认证的 API
+        if name == axum::http::header::AUTHORIZATION {
+            continue;
+        }
         if let Ok(v) = value.to_str() {
             parts.push(v.to_string());
         }
@@ -184,6 +189,7 @@ where
 pub struct SecurityBodyLayer {
     scanner: Arc<SecurityScanner>,
     body_limit: usize,
+    skip_paths: Vec<String>,
 }
 
 impl SecurityBodyLayer {
@@ -191,6 +197,7 @@ impl SecurityBodyLayer {
         Self {
             scanner: Arc::new(SecurityScanner::new()),
             body_limit: 10 * 1024 * 1024,
+            skip_paths: Vec::new(),
         }
     }
 
@@ -198,6 +205,12 @@ impl SecurityBodyLayer {
     /// Larger bodies are rejected with a 500 rather than buffered.
     pub fn body_limit(mut self, limit: usize) -> Self {
         self.body_limit = limit;
+        self
+    }
+
+    /// 跳过指定路径前缀的扫描（如认证凭据端点 body 含 JWT，属正常业务而非攻击）。
+    pub fn skip_paths(mut self, prefixes: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        self.skip_paths = prefixes.into_iter().map(Into::into).collect();
         self
     }
 }
@@ -216,6 +229,7 @@ impl<S> tower::Layer<S> for SecurityBodyLayer {
             inner,
             scanner: Arc::clone(&self.scanner),
             body_limit: self.body_limit,
+            skip_paths: self.skip_paths.clone(),
         }
     }
 }
@@ -225,6 +239,7 @@ pub struct SecurityBodyService<S> {
     inner: S,
     scanner: Arc<SecurityScanner>,
     body_limit: usize,
+    skip_paths: Vec<String>,
 }
 
 impl<S> tower::Service<Request<axum::body::Body>> for SecurityBodyService<S>
@@ -250,6 +265,11 @@ where
         let parts = request_parts(&req);
         let strings: Vec<&str> = parts.iter().map(|s| s.as_str()).collect();
         let header_results = scanner.scan_parts(&strings);
+        // 认证凭据端点（body 含 JWT 等）按前缀跳过扫描，仅透传
+        let skipped = self
+            .skip_paths
+            .iter()
+            .any(|p| req.uri().path().starts_with(p.as_str()));
 
         Box::pin(async move {
             let (parts, body) = req.into_parts();
@@ -259,11 +279,13 @@ where
                 .await
                 .map_err(|e| SecurityError::Inner(Box::new(e)))?;
 
-            let mut results = header_results;
-            results.extend(scanner.scan_body(&bytes));
+            if !skipped {
+                let mut results = header_results;
+                results.extend(scanner.scan_body(&bytes));
 
-            if let Some(err) = evaluate(&results) {
-                return Err(err);
+                if let Some(err) = evaluate(&results) {
+                    return Err(err);
+                }
             }
 
             let req = Request::from_parts(parts, axum::body::Body::from(bytes));
@@ -298,6 +320,53 @@ mod tests {
         let s = SecurityScanner::new();
         let results = s.scan("hello world");
         assert!(results.is_empty());
+    }
+
+    #[test]
+    fn jwt_like_body_is_detected_by_default() {
+        // JWT 结构会被 security_rust 判定为 jwt_attack（High）——认证凭据端点需 skip_paths 放行
+        let s = SecurityScanner::new();
+        let jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1MSJ9.sig";
+        assert!(!s.scan(jwt).is_empty());
+    }
+
+    #[test]
+    fn skip_paths_prefix_matching() {
+        let layer = SecurityBodyLayer::new().skip_paths(["/api/auth/refresh"]);
+        assert!(
+            layer
+                .skip_paths
+                .iter()
+                .any(|p| "/api/auth/refresh".starts_with(p.as_str()))
+        );
+        assert!(
+            !layer
+                .skip_paths
+                .iter()
+                .any(|p| "/api/cmdb/assets".starts_with(p.as_str()))
+        );
+    }
+
+    #[test]
+    fn authorization_header_not_scanned() {
+        // JWT 凭据头不进入扫描面（防 jwt_attack 误伤全部需认证 API）
+        let req = axum::http::Request::builder()
+            .uri("/api/k8s/clusters")
+            .header(
+                axum::http::header::AUTHORIZATION,
+                "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1MSJ9.sig",
+            )
+            .body(())
+            .unwrap();
+        let parts = request_parts(&req);
+        assert!(parts.iter().all(|p| !p.contains("eyJhbGci")));
+        // 其余头仍进入扫描面
+        let req2 = axum::http::Request::builder()
+            .uri("/api/k8s/clusters")
+            .header("x-custom", "<script>alert(1)</script>")
+            .body(())
+            .unwrap();
+        assert!(request_parts(&req2).iter().any(|p| p.contains("<script>")));
     }
 
     #[test]

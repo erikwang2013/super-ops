@@ -70,6 +70,9 @@ pub async fn append_line(dir: &str, payload: &serde_json::Value) {
     if let Err(e) = f.write_all(line.as_bytes()).await {
         tracing::warn!("audit fallback write failed: {e}");
     }
+    if let Err(e) = f.flush().await {
+        tracing::warn!("audit fallback flush failed: {e}");
+    }
 }
 
 fn now_secs() -> i64 {

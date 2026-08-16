@@ -1,6 +1,8 @@
 ch:
   base_url: "http://localhost:8124"
   database: "superops"
+  username: "superops"
+  password: "superops"
 mq:
   brokers: "localhost:9092"
   group_id: "superops-collector"

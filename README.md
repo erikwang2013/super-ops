@@ -211,7 +211,7 @@ cd frontend && npm install && npm run dev    # http://localhost:3000
 
 ## 测试与 CI
 
-- workspace 单测/集成测试 437 项全过（gateway 114 / k8s 17 / collector 62 / ecat 组件，见 `docs/audit-report-2026-08-06.md` 测试矩阵）
+- workspace 单测/集成测试 440 项全过（gateway 114 / k8s 17 / collector 62 / ecat 组件，见 `docs/audit-report-2026-08-06.md` 测试矩阵）
 - 端到端与安全验证：登录/注册、k8s 路由正误路径、认证绕过、JWT 伪造、限流 429、熔断 503、API Key 生命周期（见 `docs/audit-report-2026-08-06.md`）
 - 运行时验证：Consul 注册/注销、KV 热更新（阈值 3↔10 双向生效）、Jaeger span、Prometheus target up
 - workspace `cargo clippy --all-targets` 零警告；前端构建零警告（路由级代码拆分 + 供应商分包，vendor-antd 786.5kB / index 15.3kB）

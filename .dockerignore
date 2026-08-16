@@ -1,0 +1,20 @@
+# Rust workspace 构建缓存与产物
+target/
+**/target/
+# 前端
+frontend/node_modules/
+frontend/dist/
+node_modules/
+# 本地数据与凭据
+deploy/.env
+data/
+*.pem
+*.key
+# VCS / 工具
+.git/
+.github/
+.claude-flow/
+.claude/
+.superpowers/
+.swarm/
+*.db

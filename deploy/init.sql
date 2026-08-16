@@ -149,8 +149,8 @@ CREATE TABLE IF NOT EXISTS ticket (
   KEY idx_ticket_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- C4: 发布记录（release；发布流水线每次镜像更新落一条审计）
-CREATE TABLE IF NOT EXISTS release (
+-- C4: 发布记录（release；发布流水线每次镜像更新落一条审计；release 为 MySQL 保留字须反引号）
+CREATE TABLE IF NOT EXISTS `release` (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   cluster_id VARCHAR(64) NOT NULL DEFAULT 'default',
   namespace VARCHAR(128) NOT NULL,

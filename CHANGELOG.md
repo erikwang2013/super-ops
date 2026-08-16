@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.8.7] — 2026-08-16 — 冒烟修复（WAF JWT 误伤 ×2 + init.sql release 保留字 + 审计落盘 flush）
+
+### Fixed
+- **WAF 误伤全部需认证 API（P0，compose 冒烟发现）**：`ecat-security` 头扫描把 `Authorization: Bearer <JWT>` 判定为 `jwt_attack`，所有带 token 的请求 403。修复：认证凭据头不进入扫描面（其余头照扫）；新增回归测试（凭据头跳过 / 其他头仍扫）
+- **WAF 误伤 refresh/logout（P0，冒烟发现）**：refresh/logout 请求体含 JWT 被 body 扫描拦截。修复：`SecurityBodyLayer::skip_paths()` 按前缀跳过认证凭据端点（gateway 配置 refresh/logout）
+- **init.sql release 表无法创建（P1，冒烟发现）**：`release` 为 MySQL 保留字，`CREATE TABLE IF NOT EXISTS release` 语法错误导致 16 表中 release 缺失。修复：表名反引号
+- **审计兜底落盘不稳定（P1，测试发现）**：`append_line` 写入后未 flush，tokio 多线程下偶发丢行（20 次循环复现 ~50% 失败）。修复：write_all 后 flush（20 次全过）
+
+### Added
+- ecat-security 测试 +3（JWT body 默认检测 / skip_paths 前缀匹配 / Authorization 头不扫描）
+- 三服务 Dockerfile（gateway/k8s/collector 多阶段构建）+ .dockerignore（阶段二「发布就绪」第一步）
+
+### Verified
+- compose 冒烟：refresh 轮换 200 / 旧重放 401 / logout 204 / 吊销后刷新 401 全通过；带 token API 正常且 SQLi body 仍 403；审计链路 login→Kafka→collector→ClickHouse `audit_log` 3 条落库；collector 无集群时正确跳过（cluster_id 接线生效）
+- workspace 437 → 440 全过；clippy `-D warnings` 零警告；fmt 通过
+
 ## [1.8.6] — 2026-08-16 — W6 收口（RdbmsClient 收敛决策 + 前端 api 层测试）
 
 ### Changed
