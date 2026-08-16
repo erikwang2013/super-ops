@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.8.8] — 2026-08-16 — 阶段二：集群注册持久化（Phase 2 persistence）
+
+### Added
+- **集群注册持久化（P1）**：k8s-service `ClusterManager` 接入 MySQL（`config.database.url`）：`AddCluster` 落库、`RemoveCluster` 删库、启动时 `load()` 恢复注册（单条 kubeconfig 解析失败仅告警跳过）；未配置 database 段时保持纯内存模式（兼容）
+- `deploy/init.sql` 新增 `cluster` 表（id/name/kubeconfig/created_at）；kubeconfig 明文落库已注明生产需 at-rest 加密（后续项）
+- k8s-service 新增 `sqlx` 依赖；`ClusterManager::new(None)` 内存模式单测
+
+### Fixed
+- **WAF 误伤集群管理（P0，集成验证发现）**：`POST /api/k8s/clusters` 的 kubeconfig 含内网 `server` 地址被 SSRF 规则误判 403。修复：`skip_paths` 增加 `/api/k8s/clusters`（集群管理 body 为结构化配置，非攻击 payload）
+
+### Verified
+- 集成验证（compose MySQL）：AddCluster → MySQL 落库 → 重启 k8s-service `loaded=1` → `GET /api/k8s/clusters` 恢复集群
+- workspace 440 → 441 全过；clippy `-D warnings` 零警告；fmt 通过
+
 ## [1.8.7] — 2026-08-16 — 冒烟修复（WAF JWT 误伤 ×2 + init.sql release 保留字 + 审计落盘 flush）
 
 ### Fixed

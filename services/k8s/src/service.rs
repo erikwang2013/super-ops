@@ -86,6 +86,7 @@ impl K8sService for K8sServiceImpl {
         let req = request.into_inner();
         self.manager
             .remove(&req.cluster_id)
+            .await
             .map_err(|e| Status::not_found(e.to_string()))?;
         Ok(Response::new(RemoveClusterResponse {}))
     }
@@ -586,7 +587,7 @@ mod tests {
     #[tokio::test]
     async fn exec_pod_rejects_empty_stream() {
         let svc = K8sServiceImpl {
-            manager: ClusterManager::new(),
+            manager: ClusterManager::new(None),
         };
         let req = Request::new(exec_stream(vec![]));
         let err = svc.exec_pod(req).await.unwrap_err();
@@ -596,7 +597,7 @@ mod tests {
     #[tokio::test]
     async fn exec_pod_unknown_cluster_is_not_found() {
         let svc = K8sServiceImpl {
-            manager: ClusterManager::new(),
+            manager: ClusterManager::new(None),
         };
         let req = Request::new(exec_stream(vec![ExecRequest {
             cluster_id: "nope".into(),
@@ -609,7 +610,7 @@ mod tests {
     #[tokio::test]
     async fn scale_deployment_invalid_replicas_is_invalid_argument() {
         let svc = K8sServiceImpl {
-            manager: ClusterManager::new(),
+            manager: ClusterManager::new(None),
         };
         let req = Request::new(superops_protos::k8s::v1::ScaleDeploymentRequest {
             cluster_id: "c".into(),
@@ -624,7 +625,7 @@ mod tests {
     #[tokio::test]
     async fn scale_deployment_unknown_cluster_is_not_found() {
         let svc = K8sServiceImpl {
-            manager: ClusterManager::new(),
+            manager: ClusterManager::new(None),
         };
         let req = Request::new(superops_protos::k8s::v1::ScaleDeploymentRequest {
             cluster_id: "nope".into(),
@@ -639,7 +640,7 @@ mod tests {
     #[tokio::test]
     async fn run_job_empty_cluster_is_invalid_argument() {
         let svc = K8sServiceImpl {
-            manager: ClusterManager::new(),
+            manager: ClusterManager::new(None),
         };
         let req = Request::new(RunJobRequest {
             cluster_id: "".into(),
@@ -656,7 +657,7 @@ mod tests {
     #[tokio::test]
     async fn run_job_unknown_cluster_is_not_found() {
         let svc = K8sServiceImpl {
-            manager: ClusterManager::new(),
+            manager: ClusterManager::new(None),
         };
         let req = Request::new(RunJobRequest {
             cluster_id: "nope".into(),

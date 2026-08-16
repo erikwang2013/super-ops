@@ -24,7 +24,28 @@ async fn main() -> anyhow::Result<()> {
         ),
         None => None,
     };
-    let manager = ClusterManager::new();
+    // Phase 2 persistence：配置 database.url 时启用集群注册持久化（MySQL）；
+    // 连接失败降级为纯内存模式（启动 WARN，不影响服务）
+    let pool = match config.database.url.as_str() {
+        url if !url.is_empty() => {
+            match sqlx::mysql::MySqlPoolOptions::new()
+                .max_connections(2)
+                .connect(url)
+                .await
+            {
+                Ok(p) => Some(p),
+                Err(e) => {
+                    tracing::warn!(error = %e, "cluster persistence db connect failed; falling back to in-memory");
+                    None
+                }
+            }
+        }
+        _ => None,
+    };
+    let manager = ClusterManager::new(pool);
+    if let Err(e) = manager.load().await {
+        tracing::warn!(error = %e, "cluster load from database failed; starting with empty registry");
+    }
     let auth_token = config.auth.token.clone();
     let service = K8sServiceImpl { manager };
 

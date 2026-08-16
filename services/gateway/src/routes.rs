@@ -689,8 +689,9 @@ pub async fn app(
                 .layer(
                     ecat_security::SecurityBodyLayer::new()
                         .body_limit(10 * 1024 * 1024)
-                        // 认证凭据端点 body 含 JWT，跳过 WAF 扫描（防 jwt_attack 误判）
-                        .skip_paths(["/api/auth/refresh", "/api/auth/logout"]),
+                        // 认证凭据端点 body 含 JWT、集群管理 body 含 kubeconfig（含内网 server 地址，
+                        // 会被 SSRF 规则误判），均属结构化业务数据，跳过 WAF 扫描
+                        .skip_paths(["/api/auth/refresh", "/api/auth/logout", "/api/k8s/clusters"]),
                 ),
         )
         .with_state(state)

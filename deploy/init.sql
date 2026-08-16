@@ -232,3 +232,12 @@ CREATE TABLE IF NOT EXISTS resource_quota (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_quota (cluster_id, namespace)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 阶段二：k8s-service 集群注册持久化（Phase 2 persistence）
+-- kubeconfig 为注册凭据；生产部署建议配合磁盘加密或后续 at-rest 加密改造
+CREATE TABLE IF NOT EXISTS `cluster` (
+    id VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(128) NOT NULL,
+    kubeconfig MEDIUMTEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
