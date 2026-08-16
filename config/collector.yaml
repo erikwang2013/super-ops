@@ -8,6 +8,12 @@ lock:
   url: "redis://localhost:6380"
 k8s:
   endpoint: "http://localhost:9091"
+  # 服务间访问 k8s-service 的 Bearer 令牌（须与 k8s-service.yaml `auth.token` 一致）；
+  # 留空 = 明文连接（本地开发）；非空 = 每次 gRPC 请求注入 authorization 头
+  token: ""
+  # 目标集群 id：留空时启动期自动经 k8s-service ListClusters 取首个注册集群；
+  # 多集群巡检时显式指定（k8s-service AddCluster 返回的 id）
+  # cluster_id: ""
 collector:
   collect_interval_secs: 60
   inspect_interval_secs: 600

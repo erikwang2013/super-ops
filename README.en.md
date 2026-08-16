@@ -196,11 +196,11 @@ Infra passwords are injected via `deploy/.env` (template: `deploy/.env.example`)
 
 ## Tests & CI
 
-- 408 workspace unit/integration tests, all passing (gateway 97 / k8s 14 / collector 55 / ecat crates; see the test matrix in `docs/audit-report-2026-08-06.md`)
+- 437 workspace unit/integration tests, all passing (gateway 114 / k8s 17 / collector 62 / ecat crates; see the test matrix in `docs/audit-report-2026-08-06.md`)
 - E2E & security: login/register, k8s route happy & error paths, auth bypass, JWT forgery, 429 rate limit, 503 breaker, API Key lifecycle (see `docs/audit-report-2026-08-06.md`)
 - Runtime checks: Consul register/deregister, KV hot reload (threshold 3↔10 both ways), Jaeger spans, Prometheus target up
 - Workspace-wide `cargo clippy --all-targets` has zero warnings; frontend build is warning-free (route-level code splitting + vendor chunking, vendor-antd 786.5kB / index 15.3kB)
-- CI (`.github/workflows/ci.yml`): `cargo fmt --check` + `cargo check` + `cargo test` + `npm run build`
+- CI (`.github/workflows/ci.yml`): workspace-wide `cargo fmt --check` + `cargo check --workspace` + `cargo test --workspace` + `cargo clippy --workspace --all-targets -- -D warnings` + frontend `npm run test` + `npm run build`
 
 ## Known Limits
 
@@ -223,6 +223,7 @@ Infra passwords are injected via `deploy/.env` (template: `deploy/.env.example`)
 ## Docs
 
 - `docs/audit-report-2026-08-06.md` — full audit report (test matrix, security checklist, fixes)
+- `docs/project-plan-2026-08.md` — next-phase project plan (team reconnaissance synthesis: task list / risk register / role matrix / sprint plan)
 - `docs/images/` — architecture & diagram gallery (architecture / flow / design / structure / security / lifecycle / tree)
 - `docs/superpowers/plans/` — per-phase implementation plans (P1 MVP / P2 resilience / P3 integration)
 - `CHANGELOG.md` — changelog

@@ -22,6 +22,17 @@ redis:
 services:
   k8s:
     endpoint: "http://localhost:9091"
+    # 服务间访问 k8s-service 的 Bearer 令牌（须与 k8s-service.yaml `auth.token` 一致）；
+    # 留空 = 明文连接（本地开发）；非空 = 每次 gRPC 请求注入 authorization 头
+    token: ""
+
+audit:
+  # 审计可靠性：MQ 缺失/发布失败时审计落本地 JSONL 兜底（data/audit/audit-YYYYMMDD.jsonl）
+  fallback_dir: "data/audit"
+
+rate_limit:
+  # 登录限流键：false = 取真实对端 IP（防 XFF 伪造绕过）；true = 信任反向代理头（仅当网关后有可信代理）
+  trust_proxy: false
 
 ch:
   base_url: "http://localhost:8124"

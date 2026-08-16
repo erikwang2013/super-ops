@@ -211,11 +211,11 @@ cd frontend && npm install && npm run dev    # http://localhost:3000
 
 ## 测试与 CI
 
-- workspace 单测/集成测试 408 项全过（gateway 97 / k8s 14 / collector 55 / ecat 组件，见 `docs/audit-report-2026-08-06.md` 测试矩阵）
+- workspace 单测/集成测试 437 项全过（gateway 114 / k8s 17 / collector 62 / ecat 组件，见 `docs/audit-report-2026-08-06.md` 测试矩阵）
 - 端到端与安全验证：登录/注册、k8s 路由正误路径、认证绕过、JWT 伪造、限流 429、熔断 503、API Key 生命周期（见 `docs/audit-report-2026-08-06.md`）
 - 运行时验证：Consul 注册/注销、KV 热更新（阈值 3↔10 双向生效）、Jaeger span、Prometheus target up
 - workspace `cargo clippy --all-targets` 零警告；前端构建零警告（路由级代码拆分 + 供应商分包，vendor-antd 786.5kB / index 15.3kB）
-- CI（`.github/workflows/ci.yml`）：`cargo fmt --check` + `cargo check` + `cargo test` + `npm run build`
+- CI（`.github/workflows/ci.yml`）：workspace `cargo fmt --check` + `cargo check --workspace` + `cargo test --workspace` + `cargo clippy --workspace --all-targets -- -D warnings` + 前端 `npm run test` + `npm run build`
 
 ## 已知边界
 
@@ -242,6 +242,7 @@ cd frontend && npm install && npm run dev    # http://localhost:3000
 ## 文档
 
 - `docs/audit-report-2026-08-06.md` — 全量审查报告（测试矩阵、安全清单、修复记录）
+- `docs/project-plan-2026-08.md` — 下一阶段项目规划（团队侦察合成：任务清单 / 风险登记册 / 分工矩阵 / 冲刺计划）
 - `docs/multicloud.md` — 多云接入指南（多集群注册流程、按集群操作端点、跨集群聚合视图）
 - `docs/images/` — 架构图与图集（architecture / flow / design / structure / security / lifecycle / tree）
 - `docs/superpowers/plans/` — 各阶段实施计划（P1 MVP / P2 韧性 / P3 集成）

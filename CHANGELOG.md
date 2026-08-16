@@ -1,6 +1,86 @@
 # Changelog
 
+## [1.8.6] — 2026-08-16 — W6 收口（RdbmsClient 收敛决策 + 前端 api 层测试）
+
+### Changed
+- **RdbmsClient 收敛决策落地（P0-12）**：服务数据层保持直连 `sqlx::mysql::MySqlPool`（强类型绑定 / 事务非 `serde_json::Value` 参数化可替代），`ecat-data` 的 `RdbmsClient` / `SqlxClient` 抽象不采纳为服务层（trait 保留为框架储备）；清理 gateway/k8s 的 `ecat-data-sqlx` 死依赖（源码零引用）
+- **前端测试扩充**：新增 `services/api.test.ts` ×4（Authorization 头注入 / 401 自动登出 / 后端错误透传含 status / 204 处理），前端 vitest 3 → 7 用例
+
+### Verified
+- 前端 vitest 7/7 通过；gateway/k8s 删依赖后编译通过；workspace clippy `-D warnings` 零警告、437 测试全过
+
+## [1.8.5] — 2026-08-16 — W5 认证闭环 + 框架快赢（refresh 闭环 / 限流键可信化 / etcd 三缺陷）
+
+### Added
+- **refresh token 闭环（P0）**：`POST /api/auth/refresh`（校验 refresh → Redis jti 黑名单检查 → 轮换签发新 access+refresh，旧 jti 立即作废防重放）+ `POST /api/auth/logout`（吊销 refresh）；登录/注册/刷新签发的 JWT 均带 `jti` claim；新增 `auth::blacklist`（Redis，`get_multiplexed_async_connection`）
+- **限流键可信化（P1）**：登录限流默认取真实对端 IP（axum `ConnectInfo`，ecat-transport-http 已注入）；`rate_limit.trust_proxy` 开启时才信任 X-Forwarded-For / X-Real-IP，防 XFF 伪造绕过
+- **etcd 注册中心三缺陷修复（P0）**：① lease 保活循环（原只创建不续约，30s 后注册静默过期）；② `list_services` 服务层前缀修复（原 `discover("")` 双斜杠永不命中）；③ `deregister` 改为实例级 key 精确删除（原按前缀删全部实例）
+
+### Changed
+- `ecat-transport-http`：`axum::serve` 注入 ConnectInfo（`into_make_service_with_connect_info`）
+
+### Verified
+- gateway 112 → 114（含恢复 validate_user_status 测试 ×2）、ecat-registry-etcd 2 → 4；workspace 433 → 437 全过；clippy（gateway/etcd/http-transport）`-D warnings` 零警告；fmt 通过
+
+## [1.8.4] — 2026-08-16 — W4 消息与审计（Kafka 手动 offset commit + 审计本地兜底）
+
+### Fixed
+- **Kafka 审计消费丢消息（P0）**：`enable.auto.commit=false` 但无手动 commit，进程重启后停机期间审计消息全丢。`MessageStream` 新增 `commit()`（Kafka 后端 `store_offset` + `commit_consumer_state`，其余后端 no-op）；collector 审计消费在 CH 写入成功后才 commit（at-least-once：写失败不提交，重启重放不丢审计）
+- **审计 MQ 缺失/失败静默丢弃（P0）**：gateway 写操作审计（k8s 写操作 + 登录/注册）统一收敛到 `audit::publish`：MQ 发布失败或 `mq=None` 时落本地 JSONL 兜底（`audit.fallback_dir`，默认 `data/audit/audit-YYYYMMDD.jsonl`），审计不静默丢失；删除 k8s_proxy 与 auth/handler 的重复 publish_audit 实现（此前各自 `if let Some(mq)` 静默丢弃）
+
+### Added
+- 审计兜底 JSONL 单测 ×2（UTC 日期格式 / 两行追加与内容完整）
+
+### Verified
+- gateway 110 → 112，workspace 431 → 433 全过；clippy（gateway/collector/ecat-mq/ecat-mq-kafka）`-D warnings` 零警告；fmt 通过
+
+## [1.8.3] — 2026-08-16 — W3 安全基线（审批门禁统一 + k8s-service 服务间鉴权）
+
+### Fixed
+- **混沌 delete 绕过审批门禁（P0）**：`/api/chaos/{id}/run` 的 delete 动作此前直连 `delete_deployment`、不经 `is_delete_approved`；现与 k8s 删除路由统一走共享门禁 `check_delete_approval`（`approval.enabled` 时未审批 412 拦截，实验标记 failed）
+- **审批门禁统一下沉**：删除类审批检查收敛为 `model::approval::check_delete_approval`（k8s 删除路由 + 混沌 delete 共用），target 约定 `{cluster_id}/{ns}/{name}` 防跨集群同名绕过
+- **k8s-service 无鉴权（P0）**：配置 `auth.token` 时启用 Bearer 鉴权（tonic interceptor，无凭据/错误令牌 → 401 Unauthenticated）；gateway/collector 经 `BearerChannel` 透明层注入 `authorization` 头（token 为空保持明文兼容）；`config/gateway.yaml` / `k8s-service.yaml` / `collector.yaml` 增加 token 段与注释
+
+### Added
+- 审批门禁回归测试 ×3（target 格式 / 关闭直通 / 开启时无库 fail-closed）
+- k8s-service 鉴权单元测试 ×3（缺令牌拒 / 匹配放行 / 错令牌与畸形令牌拒）
+
+### Verified
+- gateway 107 → 110、k8s 14 → 17，workspace 425 → 431 全过；`cargo clippy -p superops-gateway -p superops-k8s -p superops-collector --all-targets -- -D warnings` 零警告；fmt 通过
+
+## [1.8.2] — 2026-08-16 — W2 数据通路（collector cluster_id 接线 + 契约测试）
+
+### Fixed
+- **cluster_id 数据通路修复（P0）**：collector 六类周期任务（采集 collect / 日志 logtail / 巡检 inspect / 自愈 selfheal / 漂移 drift / 容量 collect_capacity）此前以空 `cluster_id` 调用 k8s-service，`ClusterManager.get("")` 必返回 NotFound——真实集群注册后首调即失败、全链路失效。新增 `k8s.cluster_id` 配置与自动解析（未配置时经 `ListClusters` 取首个注册集群），任务统一携带真实 cluster_id；无注册集群时任务跳过本轮并告警（不崩溃、不阻断服务）
+- 容量快照 `capacity_snapshot` 的 `cluster` tag 由硬编码 `"default"` 改为真实 cluster_id
+
+### Added
+- `cluster.rs` 目标集群解析模块 + 5 项契约测试（mock k8s-service gRPC：配置优先 / `ListClusters` 回退取首个 / 无集群 None / 端点不可达 Err / 取首个纯函数）
+- `config/collector.yaml` k8s 段新增 `cluster_id` 配置说明（多集群巡检可显式指定）
+
+### Verified
+- collector 测试 57 → 62 全过；`cargo clippy -p superops-collector --all-targets -- -D warnings` 零警告（修复 `clippy::needless_update`×3）；workspace 测试 420 → 425
+
+## [1.8.1] — 2026-08-16 — 工程基线（项目规划落盘 + 版本归一 + CI 全覆盖 + 前端测试脚手架）
+
+### Added
+- **下一阶段项目规划**：`docs/project-plan-2026-08.md` —— 7 个领域侦察 agent 并行勘察 + 系统架构师合成 + Lead 验收（数据通路修复 / 安全基线 / 质量门禁 / 发布就绪：P0×12 + P1×18 + 风险 Top10 + 分工矩阵 + 6 周冲刺）
+- **前端测试脚手架**：vitest + `stores/auth.test.ts` 冒烟用例（`npm run test`），前端从零测试起步
+
+### Changed
+- **版本归一**：workspace `version` 1.1.6 → 1.8.0（三服务与全部 ecat-* crate 随 workspace 对齐产品版本）；Helm `appVersion` 1.2.0 → 1.8.0；Tauri `version` 0.1.0 → 1.8.0；frontend `version` → 1.8.0
+- **echarts 依赖修复**：`echarts@^6.1.0` 声明进 `frontend/package.json`（此前为根 `package.json` 幽灵依赖，干净环境 `npm ci` 构建必失败）；根 `package.json` 收敛为 `{"private": true}`
+- **CI 全覆盖**：`.github/workflows/ci.yml` 改为 workspace 全量 `cargo fmt --check` + `cargo check --workspace` + `cargo test --workspace` + 独立 clippy job（`--all-targets -- -D warnings`）+ 前端 `npm run test` + `npm run build`；移除永不触发的死配置（`ecat-deploy/.github`、`ecat-deploy/.gitlab-ci.yml`）
+- **README 测试数同步**：408 → 420（gateway 97→107、collector 55→57），中英文同步；CI 段更新
+
+### Fixed
+- gateway `cmdb_topology.rs` 测试辅助函数触发 `clippy::too_many_arguments`（rust 1.97 下 `-D warnings` 失败）——README 原「clippy 零警告」声明在真实门禁下不成立，已修复并实测验证
+
+### Verified
+- `cargo clippy --workspace --all-targets -- -D warnings` 实测零警告；前端 `npm install` + `npm run test` 通过；README 数字与实测一致（420）
+
 ## [1.8.0] — 2026-08-07 — 生态扩展七连（图拓扑 + ES 检索 + S3 备份 + MQ 多协议 + etcd + GraphQL + 领域事件）
+
 
 ### Added
 - **CMDB 资产拓扑（图数据库）**：gateway `cmdb_topology.rs` —— `POST /api/cmdb/topology/sync`（资产 → 图节点 / depends_on 依赖边 upsert，孤儿节点清理）、`GET /api/cmdb/topology`（节点 + 边查询）、`POST /api/cmdb/topology/explore`（原生图查询，结果上限 4KB）；图后端 provider 抽象（neo4j / nebulagraph / arangodb，gateway.yaml `graph:` 段，未配置时返回明确降级信息）；前端 `/cmdb` 新增「拓扑图」Tab（手写 SVG 圆环布局：资产类型着色条 + 状态描边 + 名称截断 + 同步按钮）

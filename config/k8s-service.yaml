@@ -1,6 +1,11 @@
 server:
   grpc_port: 9091
 
+auth:
+  # 服务间 Bearer 令牌：非空时启用鉴权（无凭据调用被拒 401）；
+  # 须与 gateway.yaml / collector.yaml 的 k8s token 一致；留空 = 不启用（本地开发，启动 WARN）
+  token: ""
+
 database:
   url: "mysql://superops:superops@localhost:3307/superops"
 
