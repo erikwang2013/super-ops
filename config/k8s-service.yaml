@@ -14,3 +14,11 @@ consul:
 
 # P6-6: OTLP 端点（扁平字符串，gateway/k8s/collector 三服务导出）
 otlp: "http://localhost:4317"
+
+# 可选 gRPC TLS；enabled=false 时明文（默认）。生产开启后须配 PEM 路径。
+tls:
+  enabled: false
+  cert_path: ""
+  key_path: ""
+  ca_cert_path: ""
+  require_client_auth: false

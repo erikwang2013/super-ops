@@ -21,5 +21,7 @@ export const k8sApi = {
   deleteDeployment: (clusterId: string, namespace: string, name: string) =>
     api.delete<{ deleted: boolean }>(`/k8s/clusters/${clusterId}/deployments/${namespace}/${name}`),
   listNodes: (clusterId: string) => api.get<{ nodes: NodeInfo[] }>(`/k8s/clusters/${clusterId}/nodes`),
+  getPodLogs: (clusterId: string, namespace: string, pod: string) =>
+    api.get<{ logs: string }>(`/k8s/clusters/${clusterId}/pods/${namespace}/${pod}/logs`),
   aggregate: () => api.get<{ clusters: AggregateCluster[]; totals: AggregateTotals }>('/k8s/aggregate'),
 };

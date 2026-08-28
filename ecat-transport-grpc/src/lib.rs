@@ -1,8 +1,11 @@
 // Copyright (c) 2026 erik <erik@erik.xyz> — https://erik.xyz
-use ecat_transport::{Server as TransportServer, TlsConfig};
+use ecat_transport::Server as TransportServer;
 use std::sync::Mutex;
 use tokio::sync::watch;
 use tonic::service::Routes;
+use tonic::transport::{Certificate, Identity, ServerTlsConfig};
+
+pub use ecat_transport::TlsConfig;
 
 pub struct GrpcServer {
     addr: String,
@@ -42,7 +45,21 @@ impl TransportServer for GrpcServer {
         let shutdown_signal = async move {
             let _ = rx.changed().await;
         };
-        tonic::transport::Server::builder()
+        let mut builder = tonic::transport::Server::builder();
+        if let Some(tls) = &self.tls_config {
+            let cert = tokio::fs::read(&tls.cert_path).await?;
+            let key = tokio::fs::read(&tls.key_path).await?;
+            let identity = Identity::from_pem(cert, key);
+            let mut tls_cfg = ServerTlsConfig::new().identity(identity);
+            if tls.require_client_auth
+                && let Some(ca_path) = &tls.ca_cert_path
+            {
+                let ca = tokio::fs::read(ca_path).await?;
+                tls_cfg = tls_cfg.client_ca_root(Certificate::from_pem(ca));
+            }
+            builder = builder.tls_config(tls_cfg)?;
+        }
+        builder
             .add_routes(routes)
             .serve_with_shutdown(addr, shutdown_signal)
             .await?;
@@ -83,5 +100,14 @@ mod tests {
     fn new_without_routes_has_none() {
         let srv = GrpcServer::new("0.0.0.0:50051");
         assert!(srv.routes.is_none());
+    }
+
+    #[test]
+    fn tls_stores_config_plaintext_by_default() {
+        let srv = GrpcServer::new("0.0.0.0:50051");
+        assert!(srv.tls_config.is_none());
+        let srv = srv.tls(TlsConfig::new("/tmp/cert.pem", "/tmp/key.pem"));
+        assert!(srv.tls_config.is_some());
+        assert!(!srv.tls_config.as_ref().unwrap().require_client_auth);
     }
 }

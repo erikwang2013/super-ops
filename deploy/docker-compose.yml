@@ -37,6 +37,7 @@ services:
       retries: 5
 
   prometheus:
+    # scrape 见 prometheus.yml：gateway :8080、k8s :9101、collector :9102；勿抓 Kafka 9092/9093
     image: prom/prometheus:v2.53.0
     ports: ["9095:9090"]
     volumes:

@@ -1,7 +1,7 @@
-# 示例镜像仓库；构建/推送由用户自行决定
+# 默认 GHCR；生产用 --set image.repository / image.tag 覆盖。本 chart 不构建、不推送镜像。
 image:
-  repository: registry.example.com/superops
-  tag: "1.2.0"
+  repository: ghcr.io/erikwang2013/super-ops
+  tag: "1.8.10"
   pullPolicy: IfNotPresent
 replicas:
   gateway: 1

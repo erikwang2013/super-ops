@@ -100,6 +100,10 @@ pub struct LogtailConfig {
     pub max_line_bytes: i32,
     #[serde(default = "default_logtail_interval")]
     pub interval_secs: u64,
+    #[serde(default = "default_cursor_ttl")]
+    pub cursor_ttl_secs: u64,
+    #[serde(default = "default_write_batch")]
+    pub write_batch_size: usize,
 }
 
 impl Default for LogtailConfig {
@@ -110,6 +114,8 @@ impl Default for LogtailConfig {
             tail_lines: 200,
             max_line_bytes: 1024,
             interval_secs: 30,
+            cursor_ttl_secs: 604800,
+            write_batch_size: 500,
         }
     }
 }
@@ -124,6 +130,14 @@ fn default_max_line() -> i32 {
 
 fn default_logtail_interval() -> u64 {
     30
+}
+
+fn default_cursor_ttl() -> u64 {
+    604800
+}
+
+fn default_write_batch() -> usize {
+    500
 }
 
 #[derive(Debug, Clone, Deserialize)]

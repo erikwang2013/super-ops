@@ -1,7 +1,9 @@
 use crate::ch::{clickhouse_from, now_secs};
 use crate::config::Config;
-use ecat_data::{DataPoint, FieldValue, TsdbClient};
+use ecat_data::{Cache as _, DataPoint, FieldValue, TsdbClient};
+use ecat_data_redis::RedisCache;
 use std::sync::Arc;
+use std::time::Duration;
 use superops_protos::k8s::v1::{GetPodLogsRequest, ListPodsRequest};
 
 pub fn truncate_line(line: &str, max_bytes: usize) -> String {
@@ -27,6 +29,21 @@ pub fn dedup_continuous(lines: &[String]) -> Vec<String> {
         }
     }
     out
+}
+
+/// 从最后一次出现的游标行之后续采；游标行不存在视为日志轮转，返回全部。
+pub fn skip_after_cursor(lines: &[String], cursor: Option<&str>) -> Vec<String> {
+    let Some(cur) = cursor.filter(|c| !c.is_empty()) else {
+        return lines.to_vec();
+    };
+    match lines.iter().rposition(|l| l == cur) {
+        Some(idx) => lines[idx + 1..].to_vec(),
+        None => lines.to_vec(),
+    }
+}
+
+fn cursor_key(cluster_id: &str, ns: &str, pod: &str) -> String {
+    format!("logtail:cursor:{cluster_id}:{ns}:{pod}")
 }
 
 pub async fn collect_once(cfg: &Config) -> anyhow::Result<()> {
@@ -70,6 +87,20 @@ pub async fn collect_once(cfg: &Config) -> anyhow::Result<()> {
         }
         None => None,
     };
+    let cache = if cfg.lock.url.is_empty() {
+        tracing::warn!("logtail cursor skipped: redis url empty");
+        None
+    } else {
+        match RedisCache::from_config(cfg.lock.clone()).await {
+            Ok(c) => Some(c),
+            Err(e) => {
+                tracing::warn!(error = %e, "logtail cursor cache unavailable");
+                None
+            }
+        }
+    };
+    let cursor_ttl = Duration::from_secs(cfg.logtail.cursor_ttl_secs.max(1));
+    let batch = cfg.logtail.write_batch_size.max(1);
     for ns in &cfg.logtail.namespaces {
         let pods = client
             .list_pods(ListPodsRequest {
@@ -111,7 +142,28 @@ pub async fn collect_once(cfg: &Config) -> anyhow::Result<()> {
                     }
                 }
             }
-            let points: Vec<DataPoint> = dedup_continuous(&lines)
+            let cursor_line = if let Some(cache) = &cache {
+                let key = cursor_key(&cluster_id, ns, &pod.name);
+                match cache.get(&key).await {
+                    Ok(Some(bytes)) => serde_json::from_slice::<serde_json::Value>(&bytes)
+                        .ok()
+                        .and_then(|v| {
+                            v.get("last_line")
+                                .and_then(|s| s.as_str())
+                                .map(str::to_string)
+                        }),
+                    Ok(None) => None,
+                    Err(e) => {
+                        tracing::warn!(error = %e, "logtail cursor get failed");
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+            let new_lines = skip_after_cursor(&lines, cursor_line.as_deref());
+            let last_raw = new_lines.last().cloned();
+            let points: Vec<DataPoint> = dedup_continuous(&new_lines)
                 .into_iter()
                 .map(|content| {
                     let content = truncate_line(&content, cfg.logtail.max_line_bytes as usize);
@@ -123,19 +175,38 @@ pub async fn collect_once(cfg: &Config) -> anyhow::Result<()> {
                 })
                 .collect();
             if !points.is_empty() {
-                TsdbClient::write(ch.as_ref(), &points).await?;
-                if let Some((search, index)) = &search_client {
-                    let ts = now_secs();
-                    for (i, content) in lines.iter().enumerate() {
-                        let id = format!("{ns}/{}/{ts}-{i}", pod.name);
-                        let doc = serde_json::json!({
-                            "namespace": ns,
-                            "pod": pod.name,
-                            "content": truncate_line(content, cfg.logtail.max_line_bytes as usize),
-                            "timestamp": ts,
-                        });
-                        if let Err(e) = search.index(index, &id, &doc).await {
-                            tracing::warn!("log search index {id} failed: {e}");
+                let mut write_ok = true;
+                for chunk in points.chunks(batch) {
+                    if let Err(e) = TsdbClient::write(ch.as_ref(), chunk).await {
+                        tracing::warn!("logtail CH write {}/{}: {e}", ns, pod.name);
+                        write_ok = false;
+                        break;
+                    }
+                }
+                if write_ok {
+                    if let (Some(cache), Some(last)) = (&cache, last_raw) {
+                        let key = cursor_key(&cluster_id, ns, &pod.name);
+                        let body = serde_json::json!({ "last_line": last });
+                        if let Err(e) = cache
+                            .set(&key, &body.to_string().into_bytes(), cursor_ttl)
+                            .await
+                        {
+                            tracing::warn!(error = %e, "logtail cursor set failed");
+                        }
+                    }
+                    if let Some((search, index)) = &search_client {
+                        let ts = now_secs();
+                        for (i, content) in new_lines.iter().enumerate() {
+                            let id = format!("{ns}/{}/{ts}-{i}", pod.name);
+                            let doc = serde_json::json!({
+                                "namespace": ns,
+                                "pod": pod.name,
+                                "content": truncate_line(content, cfg.logtail.max_line_bytes as usize),
+                                "timestamp": ts,
+                            });
+                            if let Err(e) = search.index(index, &id, &doc).await {
+                                tracing::warn!("log search index {id} failed: {e}");
+                            }
                         }
                     }
                 }
@@ -178,5 +249,13 @@ mod tests {
             dedup_continuous(&lines),
             vec!["a".to_string(), "b".to_string(), "a".to_string()]
         );
+    }
+
+    #[test]
+    fn skip_after_cursor_last_occurrence() {
+        let lines = vec!["a".into(), "b".into(), "a".into(), "c".into()];
+        assert_eq!(skip_after_cursor(&lines, Some("a")), vec!["c".to_string()]);
+        assert_eq!(skip_after_cursor(&lines, None), lines);
+        assert_eq!(skip_after_cursor(&lines, Some("missing")), lines);
     }
 }

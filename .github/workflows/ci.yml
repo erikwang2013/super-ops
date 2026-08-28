@@ -50,3 +50,25 @@ jobs:
       - run: npm ci
       - run: npm run test
       - run: npm run build
+
+  images:
+    name: Docker images (build only, no push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build gateway
+        run: docker build -f services/gateway/Dockerfile -t superops/gateway:${{ github.sha }} .
+      - name: Build k8s
+        run: docker build -f services/k8s/Dockerfile -t superops/k8s:${{ github.sha }} .
+      - name: Build collector
+        run: docker build -f services/collector/Dockerfile -t superops/collector:${{ github.sha }} .
+
+  bench-smoke:
+    name: Bench smoke (compile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build bench
+        run: cargo build -p bench

@@ -10,7 +10,54 @@ use axum::{
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
 use std::time::Duration;
-use superops_protos::k8s::v1::ExecRequest;
+use superops_protos::k8s::v1::{ExecRequest, TerminalSize};
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ExecClientMsg {
+    Resize { cols: i32, rows: i32 },
+    Stdin(String),
+}
+
+fn is_nonneg_whole(v: &serde_json::Value) -> Option<i32> {
+    match v {
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64()
+                && (0..=i32::MAX as i64).contains(&i)
+            {
+                return Some(i as i32);
+            }
+            if let Some(f) = n.as_f64()
+                && f >= 0.0
+                && f.fract() == 0.0
+                && f <= i32::MAX as f64
+            {
+                return Some(f as i32);
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+/// 仅识别 `{"type":"resize","cols":N,"rows":N}`（非负整数，允许 80.0）；其余文本当 stdin，便于输入 `{`。
+pub(crate) fn parse_exec_client_text(t: &str) -> ExecClientMsg {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(t) else {
+        return ExecClientMsg::Stdin(t.to_string());
+    };
+    let Some(obj) = v.as_object() else {
+        return ExecClientMsg::Stdin(t.to_string());
+    };
+    if obj.get("type").and_then(|x| x.as_str()) != Some("resize") {
+        return ExecClientMsg::Stdin(t.to_string());
+    }
+    let (Some(cols), Some(rows)) = (
+        obj.get("cols").and_then(is_nonneg_whole),
+        obj.get("rows").and_then(is_nonneg_whole),
+    ) else {
+        return ExecClientMsg::Stdin(t.to_string());
+    };
+    ExecClientMsg::Resize { cols, rows }
+}
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -88,14 +135,20 @@ async fn exec_socket(
             let Ok(msg) = msg else { break };
             match msg {
                 Message::Text(t) => {
-                    if req_tx
-                        .send(ExecRequest {
-                            stdin: t.as_bytes().to_vec(),
+                    let req = match parse_exec_client_text(&t) {
+                        ExecClientMsg::Resize { cols, rows } => ExecRequest {
+                            terminal_size: Some(TerminalSize {
+                                width: cols,
+                                height: rows,
+                            }),
                             ..Default::default()
-                        })
-                        .await
-                        .is_err()
-                    {
+                        },
+                        ExecClientMsg::Stdin(s) => ExecRequest {
+                            stdin: s.into_bytes(),
+                            ..Default::default()
+                        },
+                    };
+                    if req_tx.send(req).await.is_err() {
                         break;
                     }
                 }
@@ -163,4 +216,60 @@ async fn send_error(socket: WebSocket, msg: &str) {
     let _ = ws_tx
         .send(Message::Text(format!("error: {msg}").into()))
         .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_resize_json() {
+        assert_eq!(
+            parse_exec_client_text(r#"{"type":"resize","cols":80,"rows":24}"#),
+            ExecClientMsg::Resize { cols: 80, rows: 24 }
+        );
+    }
+
+    #[test]
+    fn parse_resize_float_wholes() {
+        assert_eq!(
+            parse_exec_client_text(r#"{"type":"resize","cols":80.0,"rows":24.0}"#),
+            ExecClientMsg::Resize { cols: 80, rows: 24 }
+        );
+    }
+
+    #[test]
+    fn parse_raw_and_brace_are_stdin() {
+        assert_eq!(
+            parse_exec_client_text(""),
+            ExecClientMsg::Stdin(String::new())
+        );
+        assert_eq!(
+            parse_exec_client_text("{"),
+            ExecClientMsg::Stdin("{".into())
+        );
+        assert_eq!(
+            parse_exec_client_text("ls -la"),
+            ExecClientMsg::Stdin("ls -la".into())
+        );
+    }
+
+    #[test]
+    fn parse_non_resize_or_missing_fields_are_stdin() {
+        let keep = r#"{"type":"stdin","data":"x"}"#;
+        assert_eq!(
+            parse_exec_client_text(keep),
+            ExecClientMsg::Stdin(keep.into())
+        );
+        let missing = r#"{"type":"resize","cols":80}"#;
+        assert_eq!(
+            parse_exec_client_text(missing),
+            ExecClientMsg::Stdin(missing.into())
+        );
+        let neg = r#"{"type":"resize","cols":-1,"rows":24}"#;
+        assert_eq!(
+            parse_exec_client_text(neg),
+            ExecClientMsg::Stdin(neg.into())
+        );
+    }
 }

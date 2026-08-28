@@ -4,7 +4,7 @@
 （各自对应服务读取的 YAML，见仓库 config/ 目录）。密码/密钥请用外部 Secret 注入
 （env 或 envFrom），切勿写入 configmap —— 本 chart 的 configmap 仅存非敏感配置。
 
-镜像：默认 registry.example.com/superops/*:1.2.0 仅为示例，请改为你自己的仓库
-（image.repository / image.tag）；本 chart 不构建、不推送任何镜像。
+镜像：默认 ghcr.io/erikwang2013/super-ops/{gateway,k8s,collector}:1.8.10
+（image.repository / image.tag 可覆盖）；本 chart 不构建、不推送任何镜像。
 
 升级：helm upgrade superops .

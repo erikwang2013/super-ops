@@ -543,11 +543,17 @@ impl K8sService for K8sServiceImpl {
 
     async fn get_metrics(
         &self,
-        _request: Request<GetMetricsRequest>,
+        request: Request<GetMetricsRequest>,
     ) -> GrpcResult<GetMetricsResponse> {
-        Ok(Response::new(GetMetricsResponse {
-            metrics: Vec::new(),
-        }))
+        let req = request.into_inner();
+        let client = self
+            .manager
+            .get(&req.cluster_id)
+            .map_err(|e| Status::not_found(e.to_string()))?;
+        let metrics = resource::metrics::collect_metrics(&client)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+        Ok(Response::new(GetMetricsResponse { metrics }))
     }
 }
 

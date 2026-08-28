@@ -3,7 +3,7 @@ import { useAuthStore } from './auth';
 
 describe('auth store', () => {
   beforeEach(() => {
-    useAuthStore.setState({ token: null, username: null, isAuthenticated: false });
+    useAuthStore.setState({ token: null, refreshToken: null, username: null, isAuthenticated: false });
   });
 
   it('starts unauthenticated', () => {
@@ -11,10 +11,11 @@ describe('auth store', () => {
     expect(useAuthStore.getState().token).toBeNull();
   });
 
-  it('login stores token and username', () => {
-    useAuthStore.getState().login('tok-123', 'erik');
+  it('login stores token, refresh token and username', () => {
+    useAuthStore.getState().login('tok-123', 'erik', 'ref-456');
     const s = useAuthStore.getState();
     expect(s.token).toBe('tok-123');
+    expect(s.refreshToken).toBe('ref-456');
     expect(s.username).toBe('erik');
     expect(s.isAuthenticated).toBe(true);
   });

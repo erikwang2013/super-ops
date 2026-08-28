@@ -13,6 +13,8 @@ pub struct Config {
     pub consul: Option<ConsulConfig>,
     #[serde(default)]
     pub otlp: Option<String>,
+    #[serde(default)]
+    pub tls: TlsServerConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -33,9 +35,24 @@ pub struct DatabaseConfig {
     pub url: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Default)]
 pub struct ConsulConfig {
     pub address: String,
+}
+
+/// 可选 gRPC TLS；`enabled: false` 时明文（默认）。
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct TlsServerConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub cert_path: String,
+    #[serde(default)]
+    pub key_path: String,
+    #[serde(default)]
+    pub ca_cert_path: Option<String>,
+    #[serde(default)]
+    pub require_client_auth: bool,
 }
 
 impl Config {

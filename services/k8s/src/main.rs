@@ -6,7 +6,7 @@ mod service;
 use ecat::App;
 use ecat_registry::{Registration, Registry, ServiceInfo};
 use ecat_registry_consul::ConsulRegistry;
-use ecat_transport_grpc::GrpcServer;
+use ecat_transport_grpc::{GrpcServer, TlsConfig};
 use std::sync::{Arc, Mutex};
 use superops_protos::k8s::v1::k8s_service_server::K8sServiceServer;
 
@@ -61,6 +61,18 @@ async fn main() -> anyhow::Result<()> {
         ))
     };
     let grpc = GrpcServer::new(format!("0.0.0.0:{}", config.server.grpc_port)).routes(routes);
+    let grpc = if config.tls.enabled {
+        let mut tls = TlsConfig::new(&config.tls.cert_path, &config.tls.key_path);
+        if config.tls.require_client_auth
+            && let Some(ca) = config.tls.ca_cert_path.as_deref().filter(|s| !s.is_empty())
+        {
+            tls = tls.with_client_auth(ca);
+        }
+        tracing::info!("k8s gRPC TLS enabled");
+        grpc.tls(tls)
+    } else {
+        grpc
+    };
 
     let reg_holder = Arc::new(Mutex::new(None::<Registration>));
     let reg_start = Arc::clone(&reg_holder);

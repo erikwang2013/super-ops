@@ -41,8 +41,14 @@ export default function TerminalPage() {
     ws.binaryType = 'arraybuffer';
     wsRef.current = ws;
 
-    const onResize = () => fit.fit();
-    ws.onopen = () => setConnected(true);
+    const sendResize = () => {
+      fit.fit();
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      }
+    };
+    const onResize = () => sendResize();
+    ws.onopen = () => { setConnected(true); sendResize(); };
     ws.onmessage = (e) => term.write(new Uint8Array(e.data));
     ws.onclose = () => {
       setConnected(false);

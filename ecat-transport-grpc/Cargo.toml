@@ -7,6 +7,6 @@ description = "gRPC transport implementation for e-cat"
 
 [dependencies]
 ecat-transport = { path = "../ecat-transport" }
-tonic.workspace = true
+tonic = { workspace = true, features = ["tls", "tls-roots"] }
 tokio.workspace = true
 async-trait.workspace = true

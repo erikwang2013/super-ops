@@ -9,7 +9,26 @@ class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function tryRefresh(): Promise<boolean> {
+  const { refreshToken, username } = useAuthStore.getState();
+  if (!refreshToken) return false;
+  const response = await fetch(`${BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  if (!response.ok) return false;
+  const body = await response.json().catch(() => ({}));
+  if (!body.access_token) return false;
+  useAuthStore.getState().login(
+    body.access_token,
+    username || '',
+    body.refresh_token || refreshToken,
+  );
+  return true;
+}
+
+async function request<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
   const token = useAuthStore.getState().token;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -19,6 +38,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
   if (response.status === 401) {
+    const skipRefresh = path.includes('/auth/refresh') || path.includes('/auth/login');
+    if (!retried && !skipRefresh && await tryRefresh()) {
+      return request<T>(path, options, true);
+    }
     useAuthStore.getState().logout();
     throw new ApiError('未授权，请重新登录', 401);
   }

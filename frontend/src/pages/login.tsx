@@ -15,7 +15,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await api.post<LoginResponse>('/auth/login', v);
-      login(res.access_token, v.username); message.success('登录成功');
+      login(res.access_token, v.username, res.refresh_token); message.success('登录成功');
     } catch (e: any) { message.error(e.message || '登录失败'); }
     finally { setLoading(false); }
   };
