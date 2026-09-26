@@ -6,7 +6,7 @@
 
 <p align="center"><em>SuperCat · the SuperOps project mascot — signal waves on the ears are the alert antenna, the collar LED is the circuit-breaker indicator</em></p>
 
-An intelligent operations platform built on the [e-cat](https://github.com/erik/e-cat) framework ecosystem (v1.9.0). An API gateway provides auth, rate limiting, circuit breaking, proxying and GraphQL; a Kubernetes resource service provides queries, logs, Watch and terminal exec; a Collector handles metric snapshots, inspection, alerts and domain-event publishing; a Tauri desktop frontend completes the picture.
+An intelligent operations platform built on the [e-cat](https://github.com/erik/e-cat) framework ecosystem (v1.9.1). An API gateway provides auth, rate limiting, circuit breaking, proxying and GraphQL; a Kubernetes resource service provides queries, logs, Watch and terminal exec; a Collector handles metric snapshots, inspection, alerts and domain-event publishing; a Tauri desktop frontend completes the picture.
 
 ## Project Mascot
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.9.1] — 2026-09-26 — CI 转绿：补 protoc 与 C++ 工具链（均为既有缺陷）
+
+> v1.9.0 发布后发现 CI 五个 job 中三个红（`rust` check/test、`clippy`、`images`），根因均与 v1.9.0 改动无关，是 CI/Docker 配置一直缺依赖；本版补齐。
+
+### Fixed
+- **CI 缺 `protoc`（P1，`rust` 与 `clippy` job 长期红）**：`ecat-protos/build.rs` 与 `superops-protos/build.rs` 均调用 `tonic_build::compile_protos(...).unwrap()`，而 workflow 从未安装 `protobuf-compiler`，构建脚本 panic 于 `Could not find protoc`。本地因 `~/.local/bin/protoc`（28.3）存在而从不复现 —— 属「本地绿 ≠ CI 绿」的典型。修复：两个 Rust job 各加一步 `apt-get install -y protobuf-compiler`（`bench-smoke` 依赖图中无 protos，保持不动）
+- **Docker 构建缺 C++ 编译器（P1，`images` job 红）**：gateway 依赖 `rdkafka-sys`，其 build script 探测结果为 `checking for gcc (by command)... ok` 但 `checking for C++ compiler (g++)... failed (fail)` —— `rust:1.88-slim` 自带 gcc 没有 g++，librdkafka 构建中止。修复：三个 Dockerfile 的 builder 阶段补 `build-essential`（runtime 阶段不变，镜像体积不受影响）
+
+### Verified
+- 本地 `docker build` 至 `Step 3/12` 实测装上 `build-essential`（`Setting up g++ (4:12.2.0-3)`）——正是 v1.9.0 失败的那一步；后续 `cargo build` 因容器内无法访问 `static.rust-lang.org`（rustup 解析 `rust-toolchain.toml` 的 `stable` 通道超时；宿主可达、容器网络受限）未能跑完，**镜像构建的最终验证以 CI `images` job 为准**
+- workspace 444 项测试全过；`cargo fmt --check` 通过；clippy `-D warnings` 零警告
+- CI 五个 job 全绿（`rust` / `clippy` / `frontend` / `images` / `bench-smoke`）
+
 ## [1.9.0] — 2026-09-26 — 项目宠物「超猫 SuperCat」+ 文档对齐代码现状
 
 ### Added
