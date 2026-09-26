@@ -57,6 +57,9 @@ impl AuthState {
     }
 }
 
+// axum 中间件的错误类型须实现 IntoResponse（Response 128B），签名由框架约定，
+// 无法按 clippy 建议装箱；仅此处放行 result_large_err。
+#[allow(clippy::result_large_err)]
 pub async fn auth_middleware(
     State(state): State<AppState>,
     mut req: Request<Body>,
@@ -144,6 +147,7 @@ pub fn has_permission(user_role: &str, required: &str) -> bool {
 
 /// 角色校验中间件：读取 extensions 中的 AuthClaims，按 has_permission 判定；
 /// 无权限返回 403 {"error":"forbidden"}。须在 auth_middleware 之后挂载。
+#[allow(clippy::result_large_err)] // 同上：axum 中间件签名
 pub async fn require_role(
     required: &'static str,
     req: Request<Body>,
@@ -242,6 +246,7 @@ mod tests {
         use tower::util::ServiceExt;
 
         // 测试用认证层：验证 Bearer token 并把 claims 放入 extensions（模拟 auth_middleware）
+        #[allow(clippy::result_large_err)] // 同上：axum 中间件签名
         async fn inject_claims(
             State(state): State<AuthState>,
             mut req: Request<Body>,
