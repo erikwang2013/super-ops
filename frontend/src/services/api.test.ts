@@ -71,7 +71,7 @@ describe('api request layer', () => {
     vi.stubGlobal('fetch', fetchMock);
     await expect(api.post('/k8s/clusters/1/restart', {})).resolves.toEqual({ ok: true });
 
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => { throw new Error('no body'); } } as Response));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => { throw new Error('no body'); } } as unknown as Response));
     await expect(api.delete('/k8s/clusters/1')).resolves.toBeUndefined();
   });
 });

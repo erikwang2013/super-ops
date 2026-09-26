@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # SuperOps K8s 资源服务镜像（多阶段构建）
-# 构建：docker build -f services/k8s/Dockerfile -t superops/k8s:1.8.0 .
+# 构建：docker build -f services/k8s/Dockerfile -t superops/k8s:dev .
 FROM rust:1.88-slim AS builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -4,6 +4,7 @@ import { Routes, Route, useNavigate, useLocation, Link } from 'react-router-dom'
 import { DashboardOutlined, CloudServerOutlined, DatabaseOutlined, SettingOutlined } from '@ant-design/icons';
 import { useAuthStore } from './stores/auth';
 import LoginPage from './pages/login';
+import SuperPet from './components/super-pet';
 
 const Dashboard = lazy(() => import('./pages/dashboard'));
 const ClustersPage = lazy(() => import('./pages/k8s/clusters'));
@@ -68,7 +69,7 @@ export default function App() {
   const nav = useNavigate(); const loc = useLocation();
   if (!useAuthStore((s) => s.isAuthenticated)) return <LoginPage />;
   return (
-    <ProLayout title="SuperOps" location={loc} menuDataRender={() => menuData}
+    <ProLayout title="SuperOps" logo={<SuperPet size={28} />} location={loc} menuDataRender={() => menuData}
       onMenuHeaderClick={() => nav('/dashboard')}
       menuItemRender={(item, dom) => <Link to={item.path || '/'}>{dom}</Link>}>
       <PageContainer>

@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.9.0] — 2026-09-26 — 项目宠物「超猫 SuperCat」+ 文档对齐代码现状
+
+### Added
+- **项目宠物「超猫 SuperCat」**：三张 SVG 沿用架构图集配色 —— `docs/images/pet.svg`（设定图：耳尖信号波/扫描眼/折线尾巴/项圈 LED/吊牌时钟/胸前终端 六处特征↔平台能力引线注解）、`pet-states.svg`（健康/降级/熔断三态与表情）、`pet-icon.svg`（图标版）
+- **超猫进入前端代码**：`frontend/src/components/super-pet.tsx`（内联 SVG 组件，`state = ok | degraded | alert` 驱动耳形、眼神与项圈 LED）接入登录页 Logo、侧边栏 Logo、favicon（`frontend/public/pet-icon.svg`）；Tauri 桌面应用图标 32/128/256/512 全部替换为超猫
+- **总览页「超猫值守」卡片**：按后端未确认告警级别实时切换三态（`CRIT*` → 熔断红、`WARN*` → 降级黄、无告警 → 健康绿）
+- **`AlertRow` 消费接线**：`alertApi.listAlerts` / `listAcks` 在总览页落地
+
+### Changed
+- **README 重排（中英同步）**：超猫设定图置顶（替换原 96px 小图标），新增「项目宠物 / Project Mascot」章节并**前移至项目说明之前**，含「身体特征 ↔ 平台能力 ↔ 代码位置」三列映射表与代码落地清单
+- **架构图集补齐分组标题**：架构设计（flow / design）、功能设计（structure）、安全防护（security）、生命周期（lifecycle）
+- **文档对齐阶段二成果**：集群注册 MySQL 持久化、服务间 gRPC Bearer 鉴权、k8s `GetMetrics`、gRPC TLS、logtail Redis 游标、周期任务分布式锁、告警降噪（`alert_consecutive` + open 去重）、自愈冷却与副本上限、CI 四条流水线（含镜像构建与 bench 冒烟）——README 功能表 / 已知边界 / 测试与 CI / 项目结构四处
+- **「活跃告警」指标卡换真实口径**：原先复用审计事件数（占位），改为未确认告警数（与超猫状态同源）
+- **版本归一 1.9.0**：workspace `version`、frontend `package.json`（含 `package-lock.json`）、Tauri `version`、Helm `version` / `appVersion` / `image.tag` 五处同步
+- Helm `NOTES.txt` 镜像版本改为读 `.Values.image`，三个 Dockerfile 构建示例 tag 改为 `:dev` —— 原先硬编码版本号，每次发版都会滞后
+
+### Fixed
+- **前端 `tsc` 构建失败（P1，CI 阻塞）**：`frontend/src/services/api.test.ts` 的 `as Response` 因 TS 结构比较收紧报 TS2352，`npm run build`（`tsc && vite build`）在第一步即失败；改为 `as unknown as Response`
+
+### Verified
+- workspace 444 项测试全过（`cargo test --workspace` exit 0；本轮未改动任何 `.rs` 源码，与 1.8.10 同基线）；`cargo fmt --check` 通过；clippy `--all-targets -- -D warnings` 零警告
+- 前端 vitest 8/8 通过；`npm run build`（tsc + vite）通过，vendor-antd 787.5 kB（分包策略不变）
+- SVG 全部经 `rsvg-convert` 实际渲染核对（非仅语法检查）
+
 ## [1.8.10] — 2026-08-16 — 阶段二：自愈冷却 + 周期任务分布式锁
 
 ### Added

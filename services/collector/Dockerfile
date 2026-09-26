@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # SuperOps Collector 采集/治理服务镜像（多阶段构建）
-# 构建：docker build -f services/collector/Dockerfile -t superops/collector:1.8.0 .
+# 构建：docker build -f services/collector/Dockerfile -t superops/collector:dev .
 FROM rust:1.88-slim AS builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y --no-install-recommends \

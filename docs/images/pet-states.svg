@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" font-family="'DejaVu Sans','Helvetica Neue',Arial,sans-serif" font-size="13" role="img" aria-labelledby="psTitle psDesc">
+  <title id="psTitle">超猫三态 · 项圈 LED 与表情</title>
+  <desc id="psDesc">超猫的三种状态：健康（绿）、降级（黄，半开探针或后端回退）、熔断（红，5xx 连续失败后快速失败）。LED 颜色与耳形、眼神同步变化。</desc>
+
+  <rect x="0" y="0" width="900" height="500" fill="#ffffff"/>
+  <text x="20" y="38" font-size="20" font-weight="bold" fill="#0f172a">超猫三态 · 项圈 LED 与表情</text>
+  <text x="20" y="62" font-size="12.5" fill="#64748b">LED 颜色由后端真实状态驱动，耳形与眼神同步变化 —— 平台健康度决定今天这只猫好不好撸</text>
+
+  <!-- ================= 健康 ================= -->
+  <rect x="40" y="88" width="260" height="300" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+  <circle cx="62" cy="110" r="7" fill="#22c55e"/>
+  <text x="170" y="113" font-size="14" font-weight="bold" fill="#0f172a" text-anchor="middle">健康 · OK</text>
+  <path d="M 106 192 L 94 114 L 162 158 Z" fill="#f1f5f9" stroke="#0f172a" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M 234 192 L 246 114 L 178 158 Z" fill="#f1f5f9" stroke="#0f172a" stroke-width="3" stroke-linejoin="round"/>
+  <ellipse cx="170" cy="238" rx="78" ry="72" fill="#f1f5f9" stroke="#0f172a" stroke-width="3"/>
+  <path d="M 115 184 L 106 130 L 150 160 Z" fill="#cbd5e1"/>
+  <path d="M 225 184 L 234 130 L 190 160 Z" fill="#cbd5e1"/>
+  <ellipse cx="142" cy="236" rx="18" ry="20" fill="#ffffff" stroke="#0f172a" stroke-width="3"/>
+  <circle cx="142" cy="238" r="11" fill="#2563eb"/>
+  <ellipse cx="142" cy="238" rx="5.5" ry="9" fill="#0f172a"/>
+  <circle cx="136" cy="228" r="4.5" fill="#ffffff"/>
+  <ellipse cx="198" cy="236" rx="18" ry="20" fill="#ffffff" stroke="#0f172a" stroke-width="3"/>
+  <circle cx="198" cy="238" r="11" fill="#2563eb"/>
+  <ellipse cx="198" cy="238" rx="5.5" ry="9" fill="#0f172a"/>
+  <circle cx="192" cy="228" r="4.5" fill="#ffffff"/>
+  <path d="M 161 258 Q 170 252 179 258 L 170 268 Z" fill="#f9a8d4"/>
+  <path d="M 170 268 Q 170 277 160 277 Q 152 277 150 270" stroke="#64748b" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M 170 268 Q 170 277 180 277 Q 188 277 190 270" stroke="#64748b" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <rect x="106" y="304" width="128" height="22" rx="11" fill="#2563eb" stroke="#1e40af" stroke-width="2.5"/>
+  <circle cx="220" cy="315" r="6.5" fill="#22c55e" stroke="#ffffff" stroke-width="1.5"/>
+  <circle cx="170" cy="342" r="17" fill="#eff6ff" stroke="#1e40af" stroke-width="2.5"/>
+  <circle cx="170" cy="342" r="11.5" fill="none" stroke="#2563eb" stroke-width="2"/>
+  <path d="M 170 342 L 170 333" stroke="#1e40af" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M 170 342 L 177 346" stroke="#1e40af" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="170" cy="342" r="2" fill="#1e40af"/>
+
+  <!-- ================= 降级 ================= -->
+  <rect x="320" y="88" width="260" height="300" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+  <circle cx="342" cy="110" r="7" fill="#f59e0b"/>
+  <text x="450" y="113" font-size="14" font-weight="bold" fill="#0f172a" text-anchor="middle">降级 · DEGRADED</text>
+  <path d="M 386 192 L 374 114 L 442 158 Z" fill="#f1f5f9" stroke="#0f172a" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M 514 192 L 526 114 L 458 158 Z" fill="#f1f5f9" stroke="#0f172a" stroke-width="3" stroke-linejoin="round"/>
+  <ellipse cx="450" cy="238" rx="78" ry="72" fill="#f1f5f9" stroke="#0f172a" stroke-width="3"/>
+  <path d="M 395 184 L 386 130 L 430 160 Z" fill="#cbd5e1"/>
+  <path d="M 505 184 L 514 130 L 470 160 Z" fill="#cbd5e1"/>
+  <ellipse cx="422" cy="243" rx="18" ry="13" fill="#ffffff" stroke="#0f172a" stroke-width="3"/>
+  <circle cx="422" cy="243" r="9" fill="#2563eb"/>
+  <ellipse cx="422" cy="243" rx="4.5" ry="7" fill="#0f172a"/>
+  <circle cx="417" cy="237" r="3.5" fill="#ffffff"/>
+  <ellipse cx="478" cy="243" rx="18" ry="13" fill="#ffffff" stroke="#0f172a" stroke-width="3"/>
+  <circle cx="478" cy="243" r="9" fill="#2563eb"/>
+  <ellipse cx="478" cy="243" rx="4.5" ry="7" fill="#0f172a"/>
+  <circle cx="473" cy="237" r="3.5" fill="#ffffff"/>
+  <path d="M 403 233 Q 422 229 441 233" stroke="#0f172a" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M 459 233 Q 478 229 497 233" stroke="#0f172a" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M 441 258 Q 450 252 459 258 L 450 268 Z" fill="#f9a8d4"/>
+  <path d="M 434 273 L 466 273" stroke="#64748b" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+  <rect x="386" y="304" width="128" height="22" rx="11" fill="#2563eb" stroke="#1e40af" stroke-width="2.5"/>
+  <circle cx="500" cy="315" r="6.5" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5"/>
+  <circle cx="450" cy="342" r="17" fill="#eff6ff" stroke="#1e40af" stroke-width="2.5"/>
+  <circle cx="450" cy="342" r="11.5" fill="none" stroke="#2563eb" stroke-width="2"/>
+  <path d="M 450 342 L 450 333" stroke="#1e40af" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M 450 342 L 457 346" stroke="#1e40af" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="450" cy="342" r="2" fill="#1e40af"/>
+
+  <!-- ================= 熔断 ================= -->
+  <rect x="600" y="88" width="260" height="300" rx="10" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.2"/>
+  <circle cx="622" cy="110" r="7" fill="#ef4444"/>
+  <text x="730" y="113" font-size="14" font-weight="bold" fill="#0f172a" text-anchor="middle">熔断 · BREAKER OPEN</text>
+  <g transform="rotate(-38, 694, 175)">
+    <path d="M 666 192 L 654 114 L 722 158 Z" fill="#f1f5f9" stroke="#0f172a" stroke-width="3" stroke-linejoin="round"/>
+  </g>
+  <g transform="rotate(38, 766, 175)">
+    <path d="M 794 192 L 806 114 L 738 158 Z" fill="#f1f5f9" stroke="#0f172a" stroke-width="3" stroke-linejoin="round"/>
+  </g>
+  <ellipse cx="730" cy="238" rx="78" ry="72" fill="#f1f5f9" stroke="#0f172a" stroke-width="3"/>
+  <g transform="rotate(-38, 694, 175)">
+    <path d="M 675 184 L 666 130 L 710 160 Z" fill="#cbd5e1"/>
+  </g>
+  <g transform="rotate(38, 766, 175)">
+    <path d="M 785 184 L 794 130 L 750 160 Z" fill="#cbd5e1"/>
+  </g>
+  <g stroke="#ef4444" stroke-width="2.5" stroke-linecap="round">
+    <path d="M 646 206 L 632 200"/>
+    <path d="M 642 222 L 628 222"/>
+    <path d="M 814 206 L 828 200"/>
+    <path d="M 818 222 L 832 222"/>
+  </g>
+  <ellipse cx="702" cy="236" rx="19" ry="21" fill="#ffffff" stroke="#0f172a" stroke-width="3"/>
+  <circle cx="702" cy="238" r="10" fill="#ef4444"/>
+  <ellipse cx="702" cy="238" rx="4" ry="8" fill="#0f172a"/>
+  <circle cx="696" cy="228" r="4.5" fill="#ffffff"/>
+  <ellipse cx="758" cy="236" rx="19" ry="21" fill="#ffffff" stroke="#0f172a" stroke-width="3"/>
+  <circle cx="758" cy="238" r="10" fill="#ef4444"/>
+  <ellipse cx="758" cy="238" rx="4" ry="8" fill="#0f172a"/>
+  <circle cx="752" cy="228" r="4.5" fill="#ffffff"/>
+  <path d="M 686 212 L 714 219" stroke="#0f172a" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M 774 212 L 746 219" stroke="#0f172a" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M 721 258 Q 730 252 739 258 L 730 268 Z" fill="#f9a8d4"/>
+  <path d="M 714 276 Q 730 264 746 276" stroke="#64748b" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <rect x="666" y="304" width="128" height="22" rx="11" fill="#2563eb" stroke="#1e40af" stroke-width="2.5"/>
+  <circle cx="780" cy="315" r="6.5" fill="#ef4444" stroke="#ffffff" stroke-width="1.5"/>
+  <circle cx="730" cy="342" r="17" fill="#eff6ff" stroke="#1e40af" stroke-width="2.5"/>
+  <circle cx="730" cy="342" r="11.5" fill="none" stroke="#2563eb" stroke-width="2"/>
+  <path d="M 730 342 L 730 333" stroke="#1e40af" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M 730 342 L 737 346" stroke="#1e40af" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="730" cy="342" r="2" fill="#1e40af"/>
+
+  <!-- 说明 -->
+  <text x="170" y="418" font-size="15" font-weight="bold" fill="#0f172a" text-anchor="middle">熔断器闭合 · 限流正常</text>
+  <text x="170" y="442" font-size="11.5" fill="#64748b" text-anchor="middle">/health、/ready 通过，无未确认告警</text>
+  <text x="170" y="460" font-size="11.5" fill="#64748b" text-anchor="middle">LED 绿 · 请求全量放行</text>
+
+  <text x="450" y="418" font-size="15" font-weight="bold" fill="#0f172a" text-anchor="middle">半开探针 / 后端回退</text>
+  <text x="450" y="442" font-size="11.5" fill="#64748b" text-anchor="middle">ES→ClickHouse、MQ 缺失时审计落盘</text>
+  <text x="450" y="460" font-size="11.5" fill="#64748b" text-anchor="middle">LED 黄 · 请求仍放行但已降级</text>
+
+  <text x="730" y="418" font-size="15" font-weight="bold" fill="#0f172a" text-anchor="middle">5xx 连续失败 → 熔断 10s</text>
+  <text x="730" y="442" font-size="11.5" fill="#64748b" text-anchor="middle">期间请求 503 快速失败，不拖垮后端</text>
+  <text x="730" y="460" font-size="11.5" fill="#64748b" text-anchor="middle">LED 红 · 半开探针成功后自动闭合</text>
+
+  <text x="20" y="490" font-size="11.5" fill="#94a3b8">同款实现：frontend/src/components/super-pet.tsx（state = ok | degraded | alert）</text>
+</svg>
