@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # SuperOps API 网关镜像（多阶段构建）
 # 构建：docker build -f services/gateway/Dockerfile -t superops/gateway:dev .
-FROM rust:1.88-slim AS builder
+FROM rust:1.98.1-slim AS builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config libssl-dev protobuf-compiler build-essential && rm -rf /var/lib/apt/lists/*

@@ -6,7 +6,7 @@
 
 <p align="center"><em>SuperCat · the SuperOps project mascot — signal waves on the ears are the alert antenna, the collar LED is the circuit-breaker indicator</em></p>
 
-An intelligent operations platform built on the [e-cat](https://github.com/erik/e-cat) framework ecosystem (v1.9.1). An API gateway provides auth, rate limiting, circuit breaking, proxying and GraphQL; a Kubernetes resource service provides queries, logs, Watch and terminal exec; a Collector handles metric snapshots, inspection, alerts and domain-event publishing; a Tauri desktop frontend completes the picture.
+An intelligent operations platform built on the [e-cat](https://github.com/erik/e-cat) framework ecosystem (v1.9.2). An API gateway provides auth, rate limiting, circuit breaking, proxying and GraphQL; a Kubernetes resource service provides queries, logs, Watch and terminal exec; a Collector handles metric snapshots, inspection, alerts and domain-event publishing; a Tauri desktop frontend completes the picture.
 
 ## Project Mascot
 
@@ -168,14 +168,23 @@ super-ops/
 | Recordings | exec WebSocket frames mirrored to ClickHouse `exec_session` (side channel; frames carry a per-session seq, replay ordered by timestamp, seq); `/api/recordings` (GET list), `/api/recordings/{sid}/frames` (GET, up to 5000 frames), `/api/recordings/{sid}` (DELETE); read api:read / write api:write; `recording.enabled` config switch (on by default) |
 | Files | `POST /api/files` (multipart, 10MB limit, filename whitelist) + `GET /api/files/{name}`, stored in MinIO, api:write/api:read |
 | Alert center | `GET /api/alerts?level=&limit=50` (ClickHouse `alert_event`, ops:cmdb), `POST /api/alerts/{id}/ack` (api:write, idempotent), `GET /api/alerts/acks` |
-| Backups | `/api/backups/status` (GET list / POST report, agent callbacks via API key), `/api/backups/summary` (per-db summary + freshness), `/api/backups/objects` (S3/MinIO bucket object list, available when the `storage:` block is configured); frontend `/ops/backups` page includes a backup-storage object card |
-| Metrics page | frontend `/ops/metrics` reuses `GET /api/v1/metrics/query` (api:read) |
+| Alert rules | `/api/alert-rules` (GET/POST/PATCH/DELETE, MySQL `alert_rule` table, ops:cmdb); the collector evaluates them: `alert_consecutive` only fires after N consecutive over-threshold cycles (Redis streak counter, auto-reset on TTL), `max_not_ready` caps node-level alerts, the same target is deduplicated within the open window; `action=restart/scale` triggers self-heal |
 | Alert notifications | generic/DingTalk/WeCom webhooks + SMTP email (`kind=email`, comma-separated recipients, password overridable via `SUPEROPS_SMTP_PASSWORD`); `levels` field filters delivery by severity (all when unset); current on-call person appended to email/webhook notifications (needs mysql); per-target silence window (default 300s) |
-| Security scan (WAF) | outermost request WAF layer (ecat-security `SecurityBodyLayer`): scans URI+headers+body (up to 10MB, body replayed to handler); SQLi/XSS etc. High/Critical hits → 403 `{"error":...}`, lower severities logged only |
-| Release pipeline | k8s-service gRPC `UpdateImage` (deployment image update) + `/api/releases` (GET/POST records) + `/api/releases/{id}/rollback` (manual rollback to previous image, 400 without one) + release page (rollback button + confirm); collector `rollback` task auto-rolls back (release ok → enter observation window after `delay` seconds; deployment ready==0 or missing → restore old image, mark failed, **off by default**) |
 | Chaos drills | `/api/chaos` (GET/POST experiment CRUD), `/api/chaos/{id}` (DELETE), `/api/chaos/{id}/run` (POST restart/delete via k8s-service), ops:cmdb; frontend `/ops/chaos` page |
+| Self-heal | on rule `action=restart/scale` the collector calls k8s restart/scale (`selfheal.enabled` **off by default**, `max_actions_per_cycle` caps actions per cycle, `cooldown_secs` cools down each deployment against repeat triggering, `max_replicas` caps scale-out); every action is audited |
+| Tickets | `/api/tickets` (GET/POST, status flow open→in_progress→resolved/closed, reopen), `/api/tickets/{id}` (GET/PATCH/DELETE); one-click ticket from an alert (inline action on `GET /api/alerts`) |
+| Runbook | `/api/runbooks` (GET/POST, `steps` JSON array), `/api/runbooks/{id}` (GET/PATCH/DELETE), `/api/runbooks/{id}/run` (runs the steps in order and returns per-step results) |
+| On-call schedule | `/api/oncall` (GET/POST, shift records + on-call person field) |
+| Release pipeline | k8s-service gRPC `UpdateImage` (deployment image update) + `/api/releases` (GET/POST records) + `/api/releases/{id}/rollback` (manual rollback to previous image, 400 without one) + release page (rollback button + confirm); collector `rollback` task auto-rolls back (release ok → enter observation window after `delay` seconds; deployment ready==0 or missing → restore old image, mark failed, **off by default**) |
+| Capacity / cost | `/api/capacity/summary`, `/api/capacity/trend` (ClickHouse aggregation: node/Pod counts, cost-estimate time series) |
+| Backups | `/api/backups/status` (GET list / POST report, agent callbacks via API key), `/api/backups/summary` (per-db summary + freshness), `/api/backups/objects` (S3/MinIO bucket object list, available when the `storage:` block is configured); frontend `/ops/backups` page includes a backup-storage object card |
+| Terminal controls | exec WS requires `?confirm=1` (`terminal.require_confirm` on by default, 400 without it) plus `terminal.max_session_secs` force-disconnect (default 1800s); the frontend shows a confirm dialog before connecting |
+| Config center | `/api/config/remote/keys` (GET, recursively lists Consul KV under the `config/superops` prefix), `/api/config/remote/keys/{key}` (GET/PUT/DELETE; key outside the prefix → 400, Consul unreachable → 502), ops:cmdb |
 | Resource quota | `resource_quota` table (UNIQUE cluster_id+namespace) + `/api/quota` (GET/POST upsert, replicas limit), `/api/quota/{id}` (DELETE), ops:cmdb; frontend `/ops/quota` page |
+| Security scan (WAF) | outermost request WAF layer (ecat-security `SecurityBodyLayer`): scans URI+headers+body (up to 10MB, body replayed to handler); SQLi/XSS etc. High/Critical hits → 403 `{"error":...}`, lower severities logged only |
 | MySQL TLS | `database.tls` config block (ecat-tls): ca_cert/client_cert/client_key PEM paths + skip_verify (true=encrypt-only without domain check / false=VerifyIdentity full check) |
+| Cross-cluster aggregate | `/api/k8s/aggregate`: fleet-wide node/Pod health summary (`nodes_ready` = Ready node count, `pods_running` = Running Pod count, plus totals) |
+| Metrics page | frontend `/ops/metrics` reuses `GET /api/v1/metrics/query` (api:read) |
 | Governance | collector `housekeeping`: MySQL backup (mysqldump → `data/backups`, keep N), disk capacity & cost estimates (collector.yaml `housekeeping:` block) |
 | Observability | `/health`, `/ready` (MySQL dependency check), `/metrics` (Prometheus), `/api/docs` (OpenAPI 3.0.3), OTLP spans (gateway/k8s/collector) |
 | Ops | Consul registration + `discover("superops-k8s")` endpoint resolution (static fallback); KV hot reload |

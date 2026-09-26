@@ -1,3 +1,6 @@
+# 钉住具体版本：CI 的 -D warnings 配合浮动 stable，任何一次 Rust 小版本升级
+# 都可能让零改动代码变红（v1.9.1 的 clippy 1.98 result_large_err 即如此）。
+# 升级请显式改这里 + ci.yml 的 dtolnay/rust-toolchain 版本 + 三个 Dockerfile 的 FROM。
 [toolchain]
-channel = "stable"
+channel = "1.98.1"
 components = ["rustfmt", "clippy"]

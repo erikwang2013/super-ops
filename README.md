@@ -6,7 +6,7 @@
 
 <p align="center"><em>超猫 SuperCat · SuperOps 项目宠物 —— 耳尖是告警天线，项圈 LED 是熔断器状态灯</em></p>
 
-基于 [e-cat](https://github.com/erik/e-cat) 框架生态构建的智能运维平台（v1.9.1）。API 网关统一承载认证、限流、熔断、反向代理与 GraphQL；Kubernetes 资源服务提供查询、日志、Watch 与终端 exec；Collector 负责指标采集、巡检、告警与领域事件发布；Tauri 桌面前端完成可视化操作。
+基于 [e-cat](https://github.com/erik/e-cat) 框架生态构建的智能运维平台（v1.9.2）。API 网关统一承载认证、限流、熔断、反向代理与 GraphQL；Kubernetes 资源服务提供查询、日志、Watch 与终端 exec；Collector 负责指标采集、巡检、告警与领域事件发布；Tauri 桌面前端完成可视化操作。
 
 ## 项目宠物
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.9.2] — 2026-09-26 — CI 工具链钉版 1.98.1 + README.en.md 功能表补齐至 parity
+
+### Changed
+- **CI 工具链钉版（消除「Rust 小版本升级 → 零改动 CI 变红」）**：此前 `dtolnay/rust-toolchain@stable` 与 `rust-toolchain.toml` 的 `channel = "stable"` 都是浮动的，配 `-D warnings`，任何一次 Rust 小版本升级都可能在零改动代码的情况下把 CI 搞红 —— v1.9.1 修的 clippy 1.98 `result_large_err` 正是此因。四处同步钉死到 **1.98.1**：
+  - `rust-toolchain.toml`：`channel = "stable"` → `"1.98.1"`（此文件优先级最高，不改它则 CI 装 1.98.1 也会被它改回 stable，钉版会失效）
+  - `.github/workflows/ci.yml`：三处 `dtolnay/rust-toolchain@stable` → `@1.98.1`
+  - `services/{gateway,k8s,collector}/Dockerfile`：`FROM rust:1.88-slim` → `rust:1.98.1-slim`（基础镜像与钉版一致，容器内无需再下载工具链）
+  - 升级路径已写在 `rust-toolchain.toml` 注释里：显式改这四处
+- **README.en.md 功能表补齐至与中文版 parity**：新增 9 行 —— Alert rules（告警规则）/ Self-heal（自愈）/ Tickets（工单）/ Runbook / On-call schedule（值班排班）/ Capacity·cost（容量成本）/ Terminal controls（终端管控）/ Config center（配置中心）/ Cross-cluster aggregate（跨集群聚合）；并把全表重排为与中文版**逐行同序**（37 行 1:1 对齐）
+
+### Verified
+- 仓库内 `cargo --version` 实测解析到 `1.98.1`（`rust-toolchain.toml` 生效），与 CI 及镜像基础镜像三者一致
+- `cargo fmt --check` 通过；`cargo test --workspace` 444 项全过；`cargo clippy --workspace --all-targets -- -D warnings` exit 0（均在本仓库钉定的 1.98.1 下执行）
+- 本地 `docker build -f services/gateway/Dockerfile` **12 步全过**（v1.9.0/v1.9.1 时该构建因容器内解析 stable 通道超时而无法在本地验证；钉版后基础镜像自带 1.98.1，构建已可本地复现）；产物冒烟：`/usr/local/bin/superops-gateway` 34.8MB 可执行、以非 root `superops`(10001) 运行、runtime 阶段无 gcc/g++（构建工具未进运行镜像）
+- CI 五个 job 全绿
+
 ## [1.9.1] — 2026-09-26 — CI 转绿：补 protoc、C++ 工具链、clippy 1.98 生成代码放行（均为既有缺陷）
 
 > v1.9.0 发布后发现 CI 五个 job 中三个红（`rust` check/test、`clippy`、`images`），根因均与 v1.9.0 改动无关 —— 是 CI/Docker 配置长期缺依赖，以及 CI 浮动 `stable` 升到 1.98 后新 lint 命中零改动代码。本版一并补齐。
