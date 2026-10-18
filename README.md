@@ -32,6 +32,30 @@
 - Tauri 桌面应用图标 —— `frontend/src-tauri/icons/`（32 / 128 / 256 / 512）
 - 总览页「超猫值守」卡片 —— 按后端未确认告警级别实时换表情（`CRIT* → alert`、`WARN* → degraded`、无告警 `ok`），「活跃告警」指标卡同源
 
+
+<!-- pet-expressions:start -->
+## 项目宠物表情形态 · 超猫 SuperCat
+
+<table align="center">
+<tr><td align="center"><img src="docs/pet-expressions/smile.svg" width="88" alt="笑"><br><b>笑</b><br><code>:emoji-smile:</code></td><td align="center"><img src="docs/pet-expressions/joy.svg" width="88" alt="欢乐"><br><b>欢乐</b><br><code>:emoji-joy:</code></td><td align="center"><img src="docs/pet-expressions/cry.svg" width="88" alt="哭"><br><b>哭</b><br><code>:emoji-cry:</code></td><td align="center"><img src="docs/pet-expressions/depressed.svg" width="88" alt="沮丧"><br><b>沮丧</b><br><code>:emoji-depressed:</code></td><td align="center"><img src="docs/pet-expressions/terrified.svg" width="88" alt="惊恐"><br><b>惊恐</b><br><code>:emoji-terrified:</code></td><td align="center"><img src="docs/pet-expressions/angry.svg" width="88" alt="愤怒"><br><b>愤怒</b><br><code>:emoji-angry:</code></td></tr>
+<tr><td align="center"><img src="docs/pet-expressions/coquettish.svg" width="88" alt="撒娇"><br><b>撒娇</b><br><code>:emoji-coquettish:</code></td><td align="center"><img src="docs/pet-expressions/cute.svg" width="88" alt="卖萌"><br><b>卖萌</b><br><code>:emoji-cute:</code></td><td align="center"><img src="docs/pet-expressions/pleasing.svg" width="88" alt="讨好"><br><b>讨好</b><br><code>:emoji-pleasing:</code></td><td align="center"><img src="docs/pet-expressions/knocking.svg" width="88" alt="敲打"><br><b>敲打</b><br><code>:emoji-knocking:</code></td><td align="center"><img src="docs/pet-expressions/facepalm.svg" width="88" alt="捂脸"><br><b>捂脸</b><br><code>:emoji-facepalm:</code></td><td align="center"><img src="docs/pet-expressions/tongue.svg" width="88" alt="吐舌头"><br><b>吐舌头</b><br><code>:emoji-tongue:</code></td></tr>
+</table>
+
+> 12 种彩色动态形态：笑 / 欢乐 / 哭 / 沮丧 / 惊恐 / 愤怒 / 撒娇 / 卖萌 / 讨好 / 敲打 / 捂脸 / 吐舌头。每个 SVG 自带表情、情绪特效与整体动效，并遵循 `prefers-reduced-motion`。
+<!-- pet-expressions:end -->
+
+<!-- assets-license:start -->
+## 视觉资产授权 / Visual Assets License
+
+本项目的项目宠物、图片、图标、表情（包括 `docs/pet-expressions/` 等目录下的
+SVG / PNG）**不是开源资产**，版权归作者所有。未经书面许可不得复制、修改、再分发或
+用于商业用途；商业使用需取得商业授权，联系 **erik@erik.xyz**。详见
+[ASSETS-LICENSE.md](ASSETS-LICENSE.md)。
+
+> 代码部分仍遵循仓库原有 `LICENSE`；第三方素材（如明确标注的 Go Gopher 等）仍遵循其原许可证。
+<!-- assets-license:end -->
+
+
 ## 项目说明
 
 SuperOps 面向中小规模基础设施运维，提供一条从「看见」到「处置」的闭环链路：
